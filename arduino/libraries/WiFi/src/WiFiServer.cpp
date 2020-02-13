@@ -1,6 +1,6 @@
 /*
-  Server.cpp - Server class for Raspberry Pi
-  Copyright (c) 2016 Hristo Gochkov  All right reserved.
+  This file is part of the Arduino NINA firmware.
+  Copyright (c) 2018 Arduino SA. All rights reserved.
 
   This library is free software; you can redistribute it and/or
   modify it under the terms of the GNU Lesser General Public
@@ -14,109 +14,129 @@
 
   You should have received a copy of the GNU Lesser General Public
   License along with this library; if not, write to the Free Software
-  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 */
-#include "WiFiServer.h"
+
+#include <errno.h>
+#include <string.h>
+
 #include <lwip/sockets.h>
-#include <lwip/netdb.h>
 
-#undef write
-#undef close
+#include "WiFiClient.h"
+#include "WiFiServer.h"
 
-int WiFiServer::setTimeout(uint32_t seconds){
-  struct timeval tv;
-  tv.tv_sec = seconds;
-  tv.tv_usec = 0;
-  if(setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *)&tv, sizeof(struct timeval)) < 0)
-    return -1;
-  return setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO, (char *)&tv, sizeof(struct timeval));
+WiFiServer::WiFiServer() :
+  WiFiServer(0)
+{
 }
 
-size_t WiFiServer::write(const uint8_t *data, size_t len){
+WiFiServer::WiFiServer(uint16_t port) :
+  _port(port),
+  _socket(-1)
+{
+  for (int i = 0; i < CONFIG_LWIP_MAX_SOCKETS; i++) {
+    _spawnedSockets[i] = -1;
+  }
+}
+
+void WiFiServer::begin()
+{
+  _socket = lwip_socket(AF_INET, SOCK_STREAM, 0);
+
+  if (_socket < 0) {
+    return;
+  }
+
+  struct sockaddr_in addr;
+  memset(&addr, 0x00, sizeof(addr));
+
+  addr.sin_family = AF_INET;
+  addr.sin_addr.s_addr = (uint32_t)0;
+  addr.sin_port = htons(_port);
+
+  if (lwip_bind(_socket, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+    lwip_close_r(_socket);
+    _socket = -1;
+    return;
+  }
+
+  if (lwip_listen(_socket, 1) < 0) {
+    lwip_close_r(_socket);
+    _socket = -1;
+    return;
+  }
+
+  int nonBlocking = 1;
+  lwip_ioctl_r(_socket, FIONBIO, &nonBlocking);
+
+  return;
+}
+
+WiFiClient WiFiServer::available(uint8_t* status)
+{
+  int result = lwip_accept(_socket, NULL, 0);
+
+  if (status) {
+    *status = (result != -1);
+  }
+
+  if (result != -1) {
+    // store the connected socket
+    for (int i = 0; i < CONFIG_LWIP_MAX_SOCKETS; i++) {
+      if (_spawnedSockets[i] == -1) {
+        _spawnedSockets[i] = result;
+        break;
+      }
+    }
+  }
+
+  result = -1;
+
+  // find an existing socket with data
+  for (int i = 0; i < CONFIG_LWIP_MAX_SOCKETS; i++) {
+    if (_spawnedSockets[i] != -1) {
+      WiFiClient c(_spawnedSockets[i]);
+
+      if (!c.connected()) {
+        // socket not connected, clear from book keeping
+        _spawnedSockets[i] = -1;
+      } else if (c.available()) {
+        result = _spawnedSockets[i];
+
+        break;
+      }
+    }
+  }
+
+  return WiFiClient(result);
+}
+
+uint8_t WiFiServer::status() {
+  // Deprecated.
   return 0;
 }
 
-void WiFiServer::stopAll(){}
+size_t WiFiServer::write(uint8_t b)
+{
+  return write(&b, 1);
+}
 
-WiFiClient WiFiServer::available(){
-  if(!_listening)
-    return WiFiClient();
-  int client_sock;
-  if (_accepted_sockfd >= 0) {
-    client_sock = _accepted_sockfd;
-    _accepted_sockfd = -1;
-  }
-  else {
-  struct sockaddr_in _client;
-  int cs = sizeof(struct sockaddr_in);
-    client_sock = lwip_accept_r(sockfd, (struct sockaddr *)&_client, (socklen_t*)&cs);
-  }
-  if(client_sock >= 0){
-    int val = 1;
-    if(setsockopt(client_sock, SOL_SOCKET, SO_KEEPALIVE, (char*)&val, sizeof(int)) == ESP_OK) {
-      val = _noDelay;
-      if(setsockopt(client_sock, IPPROTO_TCP, TCP_NODELAY, (char*)&val, sizeof(int)) == ESP_OK)
-        return WiFiClient(client_sock);
+size_t WiFiServer::write(const uint8_t *buffer, size_t size)
+{
+  size_t written = 0;
+
+  for (int i = 0; i < CONFIG_LWIP_MAX_SOCKETS; i++) {
+    if (_spawnedSockets[i] != -1) {
+      WiFiClient c(_spawnedSockets[i]);
+
+      written += c.write(buffer, size);
     }
   }
-  return WiFiClient();
+
+  return written;
 }
 
-void WiFiServer::begin(uint16_t port){
-  if(_listening)
-    return;
-  if(port){
-      _port = port;
-  }
-  struct sockaddr_in server;
-  sockfd = socket(AF_INET , SOCK_STREAM, 0);
-  if (sockfd < 0)
-    return;
-  server.sin_family = AF_INET;
-  server.sin_addr.s_addr = INADDR_ANY;
-  server.sin_port = htons(_port);
-  if(bind(sockfd, (struct sockaddr *)&server, sizeof(server)) < 0)
-    return;
-  if(listen(sockfd , _max_clients) < 0)
-    return;
-  fcntl(sockfd, F_SETFL, O_NONBLOCK);
-  _listening = true;
-  _noDelay = false;
-  _accepted_sockfd = -1;
+WiFiServer::operator bool()
+{
+  return (_port != 0 && _socket != -1);
 }
-
-void WiFiServer::setNoDelay(bool nodelay) {
-    _noDelay = nodelay;
-}
-
-bool WiFiServer::getNoDelay() {
-    return _noDelay;
-}
-
-bool WiFiServer::hasClient() {
-    if (_accepted_sockfd >= 0) {
-      return true;
-    }
-    struct sockaddr_in _client;
-    int cs = sizeof(struct sockaddr_in);
-    _accepted_sockfd = lwip_accept_r(sockfd, (struct sockaddr *)&_client, (socklen_t*)&cs);
-    if (_accepted_sockfd >= 0) {
-      return true;
-    }
-    return false;
-}
-
-void WiFiServer::end(){
-  lwip_close_r(sockfd);
-  sockfd = -1;
-  _listening = false;
-}
-
-void WiFiServer::close(){
-  end();
-}
-
-void WiFiServer::stop(){
-  end();
-}
-

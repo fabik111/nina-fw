@@ -1,6 +1,6 @@
 /*
-  Client.h - Base class that provides Client
-  Copyright (c) 2011 Adrian McEwen.  All right reserved.
+  This file is part of the Arduino NINA firmware.
+  Copyright (c) 2018 Arduino SA. All rights reserved.
 
   This library is free software; you can redistribute it and/or
   modify it under the terms of the GNU Lesser General Public
@@ -14,95 +14,51 @@
 
   You should have received a copy of the GNU Lesser General Public
   License along with this library; if not, write to the Free Software
-  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
-#ifndef _WIFICLIENT_H_
-#define _WIFICLIENT_H_
+#ifndef WIFICLIENT_H
+#define WIFICLIENT_H
 
+#include <Arduino.h>
+// #include <Client.h>
+// #include <IPAddress.h>
 
-#include "Arduino.h"
-#include "Client.h"
-#include <memory>
+class WiFiServer;
 
-class WiFiClientSocketHandle;
-class WiFiClientRxBuffer;
+class WiFiClient : public Client {
 
-class ESPLwIPClient : public Client
-{
 public:
-        virtual int connect(IPAddress ip, uint16_t port, int32_t timeout) = 0;
-        virtual int connect(const char *host, uint16_t port, int32_t timeout) = 0;
-        virtual int setTimeout(uint32_t seconds) = 0;
-};
+  WiFiClient();
 
-class WiFiClient : public ESPLwIPClient
-{
+  uint8_t status();
+
+  virtual int connect(IPAddress ip, uint16_t port);
+  virtual int connect(const char* host, uint16_t port);
+  virtual size_t write(uint8_t);
+  virtual size_t write(const uint8_t *buf, size_t size);
+  virtual int available();
+  virtual int read();
+  virtual int read(uint8_t *buf, size_t size);
+  virtual int peek();
+  virtual void flush();
+  virtual void stop();
+  virtual uint8_t connected();
+  virtual operator bool();
+  bool operator==(const WiFiClient &other) const;
+
+  virtual IPAddress remoteIP();
+  virtual uint16_t remotePort();
+
+  // using Print::write;
+
 protected:
-    std::shared_ptr<WiFiClientSocketHandle> clientSocketHandle;
-    std::shared_ptr<WiFiClientRxBuffer> _rxBuffer;
-    bool _connected;
+  friend class WiFiServer;
 
-public:
-    WiFiClient *next;
-    WiFiClient();
-    WiFiClient(int fd);
-    ~WiFiClient();
-    int connect(IPAddress ip, uint16_t port);
-    int connect(IPAddress ip, uint16_t port, int32_t timeout);
-    int connect(const char *host, uint16_t port);
-    int connect(const char *host, uint16_t port, int32_t timeout);
-    size_t write(uint8_t data);
-    size_t write(const uint8_t *buf, size_t size);
-    size_t write_P(PGM_P buf, size_t size);
-    size_t write(Stream &stream);
-    int available();
-    int read();
-    int read(uint8_t *buf, size_t size);
-    int peek();
-    void flush();
-    void stop();
-    uint8_t connected();
+  WiFiClient(int socket);
 
-    operator bool()
-    {
-        return connected();
-    }
-    WiFiClient & operator=(const WiFiClient &other);
-    bool operator==(const bool value)
-    {
-        return bool() == value;
-    }
-    bool operator!=(const bool value)
-    {
-        return bool() != value;
-    }
-    bool operator==(const WiFiClient&);
-    bool operator!=(const WiFiClient& rhs)
-    {
-        return !this->operator==(rhs);
-    };
-
-    int fd() const;
-
-    int setSocketOption(int option, char* value, size_t len);
-    int setOption(int option, int *value);
-    int getOption(int option, int *value);
-    int setTimeout(uint32_t seconds);
-    int setNoDelay(bool nodelay);
-    bool getNoDelay();
-
-    IPAddress remoteIP() const;
-    IPAddress remoteIP(int fd) const;
-    uint16_t remotePort() const;
-    uint16_t remotePort(int fd) const;
-    IPAddress localIP() const;
-    IPAddress localIP(int fd) const;
-    uint16_t localPort() const;
-    uint16_t localPort(int fd) const;
-
-    //friend class WiFiServer;
-    using Print::write;
+private:
+  int _socket;
 };
 
-#endif /* _WIFICLIENT_H_ */
+#endif // WIFICLIENT_H

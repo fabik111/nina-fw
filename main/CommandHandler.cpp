@@ -1100,7 +1100,7 @@ int setAnalogWrite(const uint8_t command[], uint8_t response[])
   uint8_t pin = command[4];
   uint8_t value = command[6];
 
-  analogWrite(pin, value);
+  ledcWrite(pin, value);
 
   response[2] = 1; // number of parameters
   response[3] = 1; // parameter 1 length
