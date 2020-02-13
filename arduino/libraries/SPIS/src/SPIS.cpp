@@ -22,9 +22,10 @@
 #include <driver/gpio.h>
 #include <driver/spi_slave.h>
 
-#include "wiring_digital.h"
-#include "WInterrupts.h"
+//#include "wiring_digital.h"
+//#include "WInterrupts.h"
 
+#include "esp32-hal-gpio.h"
 #include "SPIS.h"
 
 SPISClass::SPISClass(spi_host_device_t hostDevice, int dmaChannel, int mosiPin, int misoPin, int sclkPin, int csPin, int readyPin) :
