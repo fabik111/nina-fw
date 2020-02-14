@@ -28,7 +28,7 @@
 #include "CommandHandler.h"
 
 const char FIRMWARE_VERSION[6] = "1.3.0";
-
+const char CUSTOMCIAO[5]="ciao";
 /*IPAddress*/uint32_t resolvedHostname;
 
 #define MAX_SOCKETS CONFIG_LWIP_MAX_SOCKETS
@@ -754,6 +754,15 @@ int getFwVersion(const uint8_t command[], uint8_t response[])
 
   return 11;
 }
+int customCommand(const uint8_t command[], uint8_t response[])
+{
+  response[2] = 1; // number of parameters
+  response[3] = sizeof(CUSTOMCIAO); // parameter 1 length
+
+  memcpy(&response[4], CUSTOMCIAO, sizeof(CUSTOMCIAO));
+
+  return 10;
+}
 
 int sendUDPdata(const uint8_t command[], uint8_t response[])
 {
@@ -867,7 +876,7 @@ int setEnt(const uint8_t command[], uint8_t response[])
     char password[128 + 1];
     char identity[128 + 1];
     const char* rootCA;
-    
+
     memset(username, 0x00, sizeof(username));
     memset(password, 0x00, sizeof(password));
     memset(identity, 0x00, sizeof(identity));
@@ -1123,7 +1132,7 @@ const CommandHandlerType commandHandlers[] = {
   getConnStatus, getIPaddr, getMACaddr, getCurrSSID, getCurrBSSID, getCurrRSSI, getCurrEnct, scanNetworks, startServerTcp, getStateTcp, dataSentTcp, availDataTcp, getDataTcp, startClientTcp, stopClientTcp, getClientStateTcp,
 
   // 0x30 -> 0x3f
-  disconnect, NULL, getIdxRSSI, getIdxEnct, reqHostByName, getHostByName, startScanNetworks, getFwVersion, NULL, sendUDPdata, getRemoteData, getTime, getIdxBSSID, getIdxChannel, ping, getSocket,
+  disconnect, NULL, getIdxRSSI, getIdxEnct, reqHostByName, getHostByName, startScanNetworks, getFwVersion, customCommand, sendUDPdata, getRemoteData, getTime, getIdxBSSID, getIdxChannel, ping, getSocket,
 
   // 0x40 -> 0x4f
   setEnt, NULL, NULL, NULL, sendDataTcp, getDataBufTcp, insertDataBuf, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
@@ -1248,7 +1257,7 @@ void CommandHandlerClass::handleWiFiDisconnect()
   // close all non-listening sockets
 
   for (int i = 0; i < CONFIG_LWIP_MAX_SOCKETS; i++) {
-    struct sockaddr_in addr; 
+    struct sockaddr_in addr;
     size_t addrLen = sizeof(addr);
     int socket = LWIP_SOCKET_OFFSET + i;
 
