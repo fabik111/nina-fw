@@ -32,6 +32,7 @@ extern "C" {
 
 #include "CommandHandler.h"
 #include "thingProperties.h"
+#include <ArduinoECCX08.h>
 
 #define SPI_BUFFER_LEN SPI_MAX_DMA_LEN
 
@@ -102,7 +103,16 @@ temperature=22.0;
     setupWiFi();
   }
 
-  ArduinoCloud.begin(ArduinoIoTPreferredConnection);
+  if (!ECCX08.begin()) {
+    Serial.println("Failed to communicate with ECC508/ECC608!");
+    while (1);
+  }
+
+  if (!ECCX08.locked()) {
+    Serial.println("The ECC508/ECC608 is not locked!");
+    while (1);
+  }
+
   #ifdef ARDUINO_NINA_ESP32
     memcpy(CUSTOMCIAO,"INIT" ,sizeof("INIT"));
   #endif
@@ -181,21 +191,20 @@ void loop() {
     dumpBuffer("RESPONSE", responseBuffer, responseLength);
   }
 
-   ArduinoCloud.update();
-   temperature += 0.01;
-unsigned long current = millis();
-  if((current-tf)> 10000){
-
-  temperature += 0.5;
-  #ifdef ARDUINO_NINA_ESP32
-    String s = String(temperature);
-    //memcpy(CUSTOMCIAO,s.c_str() ,s.length());
-  #endif
-    if(temperature > 30){
-      temperature = 22.0;
-    }
-    tf = current;
+  /////////////////////
+  int rand = ECCX08.random(65535);
+  while (rand == 25106) {
+    rand = ECCX08.random(65535);
   }
+
+  String string_num = String(rand);
+  
+  #ifdef ARDUINO_NINA_ESP32
+    memset(CUSTOMCIAO, 0x00, 5);
+    memcpy(CUSTOMCIAO,string_num.c_str(), string_num.length());
+  #endif
+
+  ////////////////////
 
 }
 void onColoredLightChange() {

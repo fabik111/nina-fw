@@ -16,7 +16,7 @@
   License along with this library; if not, write to the Free Software
   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 */
-#include "arduino_secrets.h"
+
 #include <rom/uart.h>
 
 extern "C" {
@@ -31,16 +31,16 @@ extern "C" {
 #include <WiFi.h>
 
 #include "CommandHandler.h"
-#include "thingProperties.h"
 
 #define SPI_BUFFER_LEN SPI_MAX_DMA_LEN
 
 int debug = 0;
+
 char CUSTOMCIAO[5];
 
 uint8_t* commandBuffer;
 uint8_t* responseBuffer;
-unsigned long tf = 0;
+
 void dumpBuffer(const char* label, uint8_t data[], int length) {
   ets_printf("%s: ", label);
 
@@ -86,29 +86,18 @@ void setupBluetooth();
 
 void setup() {
   setDebug(debug);
- Serial.begin(9600);
+
   // put SWD and SWCLK pins connected to SAMD as inputs
   pinMode(15, INPUT);
   pinMode(21, INPUT);
- initProperties();
 
-  // Connect to Arduino IoT Cloud
-  
-temperature=22.0;
   pinMode(5, INPUT);
   if (digitalRead(5) == LOW) {
     setupBluetooth();
   } else {
     setupWiFi();
   }
-
-  ArduinoCloud.begin(ArduinoIoTPreferredConnection);
-  #ifdef ARDUINO_NINA_ESP32
-    memcpy(CUSTOMCIAO,"INIT" ,sizeof("INIT"));
-  #endif
 }
-
-
 
 // #define UNO_WIFI_REV2
 
@@ -123,7 +112,7 @@ void setupBluetooth() {
 #endif
   uart_set_hw_flow_ctrl(UART_NUM_1, UART_HW_FLOWCTRL_CTS_RTS, 5);
 
-  esp_bt_controller_config_t btControllerConfig = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
+  esp_bt_controller_config_t btControllerConfig = BT_CONTROLLER_INIT_CONFIG_DEFAULT(); 
 
   btControllerConfig.hci_uart_no = UART_NUM_1;
 #ifdef UNO_WIFI_REV2
@@ -151,7 +140,7 @@ void setupWiFi() {
   if (WiFi.status() == WL_NO_SHIELD) {
     while (1); // no shield
   }
-
+  
   commandBuffer = (uint8_t*)heap_caps_malloc(SPI_BUFFER_LEN, MALLOC_CAP_DMA);
   responseBuffer = (uint8_t*)heap_caps_malloc(SPI_BUFFER_LEN, MALLOC_CAP_DMA);
 
@@ -180,99 +169,4 @@ void loop() {
   if (debug) {
     dumpBuffer("RESPONSE", responseBuffer, responseLength);
   }
-
-   ArduinoCloud.update();
-   temperature += 0.01;
-unsigned long current = millis();
-  if((current-tf)> 10000){
-
-  temperature += 0.5;
-  #ifdef ARDUINO_NINA_ESP32
-    String s = String(temperature);
-    //memcpy(CUSTOMCIAO,s.c_str() ,s.length());
-  #endif
-    if(temperature > 30){
-      temperature = 22.0;
-    }
-    tf = current;
-  }
-
 }
-void onColoredLightChange() {
-  ColoredLight colorlight = coloredLight.getValue();
-
-  float h = colorlight.hue/360;
-  float s = colorlight.sat/100;
-  float b = colorlight.bri/200;
-
-  /*
-  if(colorlight.swi) {
-    leds.setColorHSL(0,h,s,b);
-  }else{
-    leds.setColorHSL(0,h,s,0.0);
-  }
-  */
-
-  Serial.print("Colored Light Status: ");
-  Serial.println(colorlight.swi);
-  Serial.print("Colored Light Color Hue: ");
-  Serial.print(colorlight.hue);
-  Serial.print(" Sat: ");
-  Serial.print(colorlight.sat);
-  Serial.print(" Bri: ");
-  Serial.print(colorlight.bri);
-  Serial.println();
-}
-
-
-void onDimmedLightChange() {
-  DimmedLight dimlight = dimmedLight.getValue();
-
-  /*
-  float b = dimlight.bri/200;
-  if(dimlight.swi){
-    leds.setColorHSL(1,0.1,0.0,b);
-  }else{
-    leds.setColorHSL(1,0.1,0.0,0.0);
-  }
-  */
-
-  Serial.print("Dimmed Light Status: ");
-  Serial.println(dimlight.swi);
-  Serial.print("Dimmed Light : ");
-  Serial.print(" Bri: ");
-  Serial.print(dimlight.bri);
-  Serial.println();
-}
-
-
-void onLightChange() {
-  /*
-  if(light){
-    leds.setColorHSL(2,0.1,0.0,1.0);
-  }else{
-    leds.setColorHSL(2,0.1,0.0,0.0);
-  }
-  */
-
-  Serial.print("Light Status: ");
-  Serial.println(light);
-}
-
-void handleButton() {
-  light = !light;
-  /*
-  if(light){
-    leds.setColorHSL(2,0.1,0.0,1.0);
-  }else{
-    leds.setColorHSL(2,0.1,0.0,0.0);
-  }
-  */
-
-  Serial.print("Light: ");
-  Serial.println(light);
-  delayMicroseconds(50000);
-
-}
-
-

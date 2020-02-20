@@ -29,11 +29,22 @@ extern "C" {
 
 #include <SPIS.h>
 #include <WiFi.h>
-
+#include <WiFiClient.h>
 #include "CommandHandler.h"
-#include "thingProperties.h"
+//#include "thingProperties.h"
+#include <ArduinoECCX08.h>
 
+#include <ArduinoMqttClient.h>
 #define SPI_BUFFER_LEN SPI_MAX_DMA_LEN
+WiFiClient wifiClient;
+MqttClient mqttClient(wifiClient);
+const char broker[] = "192.168.43.180";
+int        port     = 1883;
+const char topic[]  = "test";
+
+
+char ssid[] = "AndroidAP173D"; //  your network SSID (name)
+char pass[] = "hbjm0527";    // your network password (use for WPA, or use as key for WEP)
 
 int debug = 0;
 char CUSTOMCIAO[5];
@@ -90,22 +101,63 @@ void setup() {
   // put SWD and SWCLK pins connected to SAMD as inputs
   pinMode(15, INPUT);
   pinMode(21, INPUT);
- initProperties();
+ 
+ //initProperties();
 
   // Connect to Arduino IoT Cloud
   
-temperature=22.0;
+//temperature=22.0;
   pinMode(5, INPUT);
   if (digitalRead(5) == LOW) {
     setupBluetooth();
   } else {
     setupWiFi();
   }
+  
+  if (!ECCX08.begin()) {
+    Serial.println("Failed to communicate with ECC508/ECC608!");
+    while (1);
+  }
 
-  ArduinoCloud.begin(ArduinoIoTPreferredConnection);
+  if (!ECCX08.locked()) {
+    Serial.println("The ECC508/ECC608 is not locked!");
+    while (1);
+  }
+
+  int rand = ECCX08.random(65535);
+  while (rand == 25106) {
+    rand = ECCX08.random(65535);
+    delay(100);
+  }
+
+  String string_num = String(rand);
+  
   #ifdef ARDUINO_NINA_ESP32
-    memcpy(CUSTOMCIAO,"INIT" ,sizeof("INIT"));
+    memset(CUSTOMCIAO, 0x00, 5);
+    memcpy(CUSTOMCIAO,string_num.c_str(), string_num.length());
   #endif
+  WiFi.begin(ssid, pass);
+  // wait 10 seconds for connection:
+  delay(10000);
+
+	if (!mqttClient.connect(broker, port)) {
+    //Serial.print("MQTT connection failed! Error code = ");
+    //Serial.println(mqttClient.connectError());
+ #ifdef ARDUINO_NINA_ESP32
+   
+    memcpy(CUSTOMCIAO,"MQCE" ,sizeof("MQCE"));
+  #endif
+  
+  }else{
+		mqttClient.subscribe(topic);
+#ifdef ARDUINO_NINA_ESP32
+   
+    memcpy(CUSTOMCIAO,"SUBS" ,sizeof("SUBS"));
+  #endif
+	}
+
+
+  //ArduinoCloud.begin(ArduinoIoTPreferredConnection);
 }
 
 
@@ -181,9 +233,23 @@ void loop() {
     dumpBuffer("RESPONSE", responseBuffer, responseLength);
   }
 
-   ArduinoCloud.update();
-   temperature += 0.01;
-unsigned long current = millis();
+int messageSize = mqttClient.parseMessage();
+  if (messageSize) {
+    // we received a message, print out the topic and contents
+   
+		int i=0;
+		memset(CUSTOMCIAO, 0x00, 5);
+    // use the Stream interface to print the contents
+    while (mqttClient.available()) {
+      if(i<5)
+			CUSTOMCIAO[i]=(char)mqttClient.read();
+			
+    }
+		i++;
+    
+  }
+  //ArduinoCloud.update();
+  /*unsigned long current = millis();
   if((current-tf)> 10000){
 
   temperature += 0.5;
@@ -195,23 +261,23 @@ unsigned long current = millis();
       temperature = 22.0;
     }
     tf = current;
-  }
+  }*/
 
 }
-void onColoredLightChange() {
+/*void onColoredLightChange() {
   ColoredLight colorlight = coloredLight.getValue();
 
   float h = colorlight.hue/360;
   float s = colorlight.sat/100;
   float b = colorlight.bri/200;
 
-  /*
+  
   if(colorlight.swi) {
     leds.setColorHSL(0,h,s,b);
   }else{
     leds.setColorHSL(0,h,s,0.0);
   }
-  */
+  
 
   Serial.print("Colored Light Status: ");
   Serial.println(colorlight.swi);
@@ -228,14 +294,14 @@ void onColoredLightChange() {
 void onDimmedLightChange() {
   DimmedLight dimlight = dimmedLight.getValue();
 
-  /*
+  
   float b = dimlight.bri/200;
   if(dimlight.swi){
     leds.setColorHSL(1,0.1,0.0,b);
   }else{
     leds.setColorHSL(1,0.1,0.0,0.0);
   }
-  */
+  
 
   Serial.print("Dimmed Light Status: ");
   Serial.println(dimlight.swi);
@@ -247,13 +313,13 @@ void onDimmedLightChange() {
 
 
 void onLightChange() {
-  /*
+  
   if(light){
     leds.setColorHSL(2,0.1,0.0,1.0);
   }else{
     leds.setColorHSL(2,0.1,0.0,0.0);
   }
-  */
+  
 
   Serial.print("Light Status: ");
   Serial.println(light);
@@ -261,18 +327,18 @@ void onLightChange() {
 
 void handleButton() {
   light = !light;
-  /*
+  
   if(light){
     leds.setColorHSL(2,0.1,0.0,1.0);
   }else{
     leds.setColorHSL(2,0.1,0.0,0.0);
   }
-  */
+  
 
   Serial.print("Light: ");
   Serial.println(light);
   delayMicroseconds(50000);
 
 }
-
+*/
 

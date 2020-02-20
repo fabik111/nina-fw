@@ -19,9 +19,9 @@ CloudTemperature temperature;
 void initProperties(){
 
   ArduinoCloud.setThingId(THING_ID);
-  ArduinoCloud.addProperty(light, READWRITE, ON_CHANGE, onLightChange);
-  ArduinoCloud.addProperty(coloredLight, READWRITE, ON_CHANGE, onColoredLightChange);
-  ArduinoCloud.addProperty(dimmedLight, READWRITE, ON_CHANGE, onDimmedLightChange);
+  //ArduinoCloud.addProperty(light, READWRITE, ON_CHANGE, onLightChange);
+  //ArduinoCloud.addProperty(coloredLight, READWRITE, ON_CHANGE, onColoredLightChange);
+  //ArduinoCloud.addProperty(dimmedLight, READWRITE, ON_CHANGE, onDimmedLightChange);
   ArduinoCloud.addProperty(temperature, READ, ON_CHANGE, NULL);
 
 }

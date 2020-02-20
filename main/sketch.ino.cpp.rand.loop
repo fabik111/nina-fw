@@ -32,6 +32,7 @@ extern "C" {
 
 #include "CommandHandler.h"
 #include "thingProperties.h"
+#include <ArduinoECCX08.h>
 
 #define SPI_BUFFER_LEN SPI_MAX_DMA_LEN
 
@@ -101,11 +102,31 @@ temperature=22.0;
   } else {
     setupWiFi();
   }
+  
+  if (!ECCX08.begin()) {
+    Serial.println("Failed to communicate with ECC508/ECC608!");
+    while (1);
+  }
 
-  ArduinoCloud.begin(ArduinoIoTPreferredConnection);
+  if (!ECCX08.locked()) {
+    Serial.println("The ECC508/ECC608 is not locked!");
+    while (1);
+  }
+
+  int rand = ECCX08.random(65535);
+  while (rand == 25106) {
+    rand = ECCX08.random(65535);
+    delay(100);
+  }
+
+  String string_num = String(rand);
+  
   #ifdef ARDUINO_NINA_ESP32
-    memcpy(CUSTOMCIAO,"INIT" ,sizeof("INIT"));
+    memset(CUSTOMCIAO, 0x00, 5);
+    memcpy(CUSTOMCIAO,string_num.c_str(), string_num.length());
   #endif
+  
+  ArduinoCloud.begin(ArduinoIoTPreferredConnection, "192.168.43.180");
 }
 
 
@@ -181,9 +202,8 @@ void loop() {
     dumpBuffer("RESPONSE", responseBuffer, responseLength);
   }
 
-   ArduinoCloud.update();
-   temperature += 0.01;
-unsigned long current = millis();
+  //ArduinoCloud.update();
+  unsigned long current = millis();
   if((current-tf)> 10000){
 
   temperature += 0.5;

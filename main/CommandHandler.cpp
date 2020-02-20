@@ -28,7 +28,9 @@
 #include "CommandHandler.h"
 
 const char FIRMWARE_VERSION[6] = "1.3.0";
-const char CUSTOMCIAO[5]="ciao";
+#ifdef ARDUINO_NINA_ESP32
+extern char CUSTOMCIAO[5];
+#endif
 /*IPAddress*/uint32_t resolvedHostname;
 
 #define MAX_SOCKETS CONFIG_LWIP_MAX_SOCKETS

@@ -39,6 +39,36 @@ int debug = 0;
 uint8_t* commandBuffer;
 uint8_t* responseBuffer;
 
+char CUSTOMCIAO[5];
+
+////////////////////////////////////
+
+#include <WiFiClient.h>
+#include <WiFi.h>
+#include <ArduinoBearSSL.h>
+
+char ssid[] = "AndroidAP173D"; //  your network SSID (name)
+char pass[] = "hbjm0527";    // your network password (use for WPA, or use as key for WEP)
+int keyIndex = 0;            // your network key Index number (needed only for WEP)
+
+int status = WL_IDLE_STATUS;
+// if you don't want to use DNS (and reduce your sketch size)
+// use the numeric IP instead of the name for the server:
+//IPAddress server(74,125,232,128);  // numeric IP for Google (no DNS)
+char server[] = "google.com";    // name address for Google (using DNS)
+
+// Initialize the Ethernet client library
+// with the IP address and port of the server
+// that you want to connect to (port 80 is default for HTTP):
+WiFiClient client;
+BearSSLClient sslClient(client);
+
+unsigned long getTime() {
+  return WiFi.getTime();
+}
+
+////////////////////////////////////
+
 void dumpBuffer(const char* label, uint8_t data[], int length) {
   ets_printf("%s: ", label);
 
@@ -95,6 +125,38 @@ void setup() {
   } else {
     setupWiFi();
   }
+
+  /////////////////////////////////////
+
+  // Connect to WPA/WPA2 network. Change this line if using open or WEP network:
+  WiFi.begin(ssid, pass);
+  // wait 10 seconds for connection:
+  delay(10000);
+
+  #ifdef ARDUINO_NINA_ESP32
+    memcpy(CUSTOMCIAO,"CNCT",sizeof("CNCT"));
+  #endif
+
+  ArduinoBearSSL.onGetTime(getTime);
+
+  Serial.println("\nStarting connection to server...");
+  // if you get a connection, report back via serial:
+  if (sslClient.connect(server, 443)) {
+    Serial.println("connected to server");
+    // Make a HTTP request:
+    sslClient.println("GET /search?q=arduino HTTP/1.1");
+    sslClient.println("Host: www.google.com");
+    sslClient.println("Connection: close");
+    sslClient.println();
+
+    #ifdef ARDUINO_NINA_ESP32
+      memcpy(CUSTOMCIAO,"RQTD",sizeof("RQTD"));
+    #endif
+  }
+
+   delay(1000);
+
+  /////////////////////////////////////
 }
 
 // #define UNO_WIFI_REV2
@@ -146,6 +208,7 @@ void setupWiFi() {
 }
 
 void loop() {
+
   // wait for a command
   memset(commandBuffer, 0x00, SPI_BUFFER_LEN);
   int commandLength = SPIS.transfer(NULL, commandBuffer, SPI_BUFFER_LEN);
@@ -167,4 +230,26 @@ void loop() {
   if (debug) {
     dumpBuffer("RESPONSE", responseBuffer, responseLength);
   }
+
+    ////////////////////////////////////
+
+
+  // if there are incoming bytes available
+  // from the server, read them and print them:
+  char str[5];
+  int i = 0;
+  while (sslClient.available()) {
+    char c = sslClient.read();
+    if(i<5){
+      str[i] = c;
+      i++;
+    } else {
+      #ifdef ARDUINO_NINA_ESP32
+        memcpy(CUSTOMCIAO,str,sizeof(str));
+      #endif
+      return;
+    }
+  }
+  
+  ////////////////////////////////////
 }

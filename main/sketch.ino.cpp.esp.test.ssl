@@ -1,0 +1,149 @@
+/*
+  This file is part of the Arduino NINA firmware.
+  Copyright (c) 2018 Arduino SA. All rights reserved.
+
+  This library is free software; you can redistribute it and/or
+  modify it under the terms of the GNU Lesser General Public
+  License as published by the Free Software Foundation; either
+  version 2.1 of the License, or (at your option) any later version.
+
+  This library is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+  Lesser General Public License for more details.
+
+  You should have received a copy of the GNU Lesser General Public
+  License along with this library; if not, write to the Free Software
+  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+*/
+
+#include <rom/uart.h>
+
+extern "C" {
+  #include <driver/periph_ctrl.h>
+  #include <driver/uart.h>
+  #include <esp_bt.h>
+}
+
+#include <Arduino.h>
+
+
+#include <WiFi.h>
+
+#define SPI_BUFFER_LEN SPI_MAX_DMA_LEN
+
+int debug = 0;
+
+char CUSTOMCIAO[5];
+
+////////////////////////////////////
+
+#include <WiFiClient.h>
+#include <WiFi.h>
+#include <ArduinoBearSSL.h>
+
+char ssid[] = "AndroidAP173D"; //  your network SSID (name)
+char pass[] = "hbjm0527";    // your network password (use for WPA, or use as key for WEP)
+int keyIndex = 0;            // your network key Index number (needed only for WEP)
+
+int status = WL_IDLE_STATUS;
+// if you don't want to use DNS (and reduce your sketch size)
+// use the numeric IP instead of the name for the server:
+//IPAddress server(74,125,232,128);  // numeric IP for Google (no DNS)
+char server[] = "google.com";    // name address for Google (using DNS)
+
+// Initialize the Ethernet client library
+// with the IP address and port of the server
+// that you want to connect to (port 80 is default for HTTP):
+WiFiClient client;
+BearSSLClient sslClient(client);
+
+unsigned long getTime() {
+  return WiFi.getTime();
+}
+
+////////////////////////////////////
+
+void setupWiFi();
+void setupBluetooth();
+
+void setup() {
+  Serial.begin(115200);
+  delay(1000);
+  setupWiFi();
+
+  delay(1000);
+
+  /////////////////////////////////////
+
+  // Connect to WPA/WPA2 network. Change this line if using open or WEP network:
+  WiFi.begin(ssid, pass);
+  // wait 10 seconds for connection:
+  delay(10000);
+
+  #ifdef ARDUINO_NINA_ESP32
+    memcpy(CUSTOMCIAO,"CNCT",sizeof("CNCT"));
+  #endif
+
+  ArduinoBearSSL.onGetTime(getTime);
+
+  Serial.println("\nStarting connection to server...");
+  // if you get a connection, report back via serial:
+  if (sslClient.connect(server, 443)) {
+    Serial.println("connected to server");
+    // Make a HTTP request:
+    sslClient.println("GET /search?q=arduino HTTP/1.1");
+    sslClient.println("Host: www.google.com");
+    sslClient.println("Connection: close");
+    sslClient.println();
+    Serial.println("richiesta fatta");
+    #ifdef ARDUINO_NINA_ESP32
+      memcpy(CUSTOMCIAO,"RQTD",sizeof("RQTD"));
+    #endif
+  }
+
+   delay(1000);
+
+  /////////////////////////////////////
+}
+
+// #define UNO_WIFI_REV2
+
+
+
+void setupWiFi() {
+  esp_bt_controller_mem_release(ESP_BT_MODE_BTDM);
+ 
+  if (WiFi.status() == WL_NO_SHIELD) {
+    Serial.println("no wifi shield");
+    while (1); // no shield
+  }
+  
+  
+}
+
+void loop() {
+
+  // wait for a command
+ 
+    ////////////////////////////////////
+
+
+  // if there are incoming bytes available
+  // from the server, read them and print them:
+  
+  int i = 0;
+  while (sslClient.available()) {
+    char c = sslClient.read();
+    if(i<50){
+      Serial.print(c);
+      i++;
+    }else{
+      i=0;
+      Serial.print('\n');
+    }
+   
+  }
+  
+  ////////////////////////////////////
+}
