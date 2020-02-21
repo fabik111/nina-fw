@@ -1,66 +1,77 @@
 /*
-  This file is part of the Arduino NINA firmware.
-  Copyright (c) 2018 Arduino SA. All rights reserved.
+ *  Udp.cpp: Library to send/receive UDP packets.
+ *
+ * NOTE: UDP is fast, but has some important limitations (thanks to Warren Gray for mentioning these)
+ * 1) UDP does not guarantee the order in which assembled UDP packets are received. This
+ * might not happen often in practice, but in larger network topologies, a UDP
+ * packet can be received out of sequence.
+ * 2) UDP does not guard against lost packets - so packets *can* disappear without the sender being
+ * aware of it. Again, this may not be a concern in practice on small local networks.
+ * For more information, see http://www.cafeaulait.org/course/week12/35.html
+ *
+ * MIT License:
+ * Copyright (c) 2008 Bjoern Hartmann
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ *
+ * bjoern@cs.stanford.edu 12/30/2008
+ */
 
-  This library is free software; you can redistribute it and/or
-  modify it under the terms of the GNU Lesser General Public
-  License as published by the Free Software Foundation; either
-  version 2.1 of the License, or (at your option) any later version.
+#ifndef _WIFIUDP_H_
+#define _WIFIUDP_H_
 
-  This library is distributed in the hope that it will be useful,
-  but WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-  Lesser General Public License for more details.
-
-  You should have received a copy of the GNU Lesser General Public
-  License along with this library; if not, write to the Free Software
-  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-*/
-
-#ifndef WIFIUDP_H
-#define WIFIUDP_H
-
-// #include <Udp.h>
+#include <Arduino.h>
+#include <Udp.h>
+#include <cbuf.h>
 
 class WiFiUDP : public UDP {
-
+private:
+  int udp_server;
+  IPAddress multicast_ip;
+  IPAddress remote_ip;
+  uint16_t server_port;
+  uint16_t remote_port;
+  char * tx_buffer;
+  size_t tx_buffer_len;
+  cbuf * rx_buffer;
 public:
   WiFiUDP();
-  virtual uint8_t begin(uint16_t);
-  virtual uint8_t beginMulticast(IPAddress, uint16_t);
-  virtual void stop();
-
-  virtual int beginPacket(IPAddress ip, uint16_t port);
-  virtual int beginPacket(const char *host, uint16_t port);
-  virtual int endPacket();
-  virtual size_t write(uint8_t);
-  virtual size_t write(const uint8_t *buffer, size_t size);
-
-  // using Print::write;
-
-  virtual int parsePacket();
-  virtual int available();
-  virtual int read();
-  virtual int read(unsigned char* buffer, size_t len);
-  virtual int read(char* buffer, size_t len) { return read((unsigned char*)buffer, len); };
-  virtual int peek();
-  virtual void flush();
-
-  virtual IPAddress remoteIP();
-  virtual uint16_t remotePort();
-
-  virtual operator bool() { return _socket != -1; }
-
-private:
-  int _socket;
-  uint32_t _remoteIp;
-  uint16_t _remotePort;
-
-  uint8_t _rcvBuffer[1500];
-  uint16_t _rcvIndex;
-  uint16_t _rcvSize;
-  uint8_t _sndBuffer[1500];
-  uint16_t _sndSize;
+  ~WiFiUDP();
+  uint8_t begin(IPAddress a, uint16_t p);
+  uint8_t begin(uint16_t p);
+  uint8_t beginMulticast(IPAddress a, uint16_t p);
+  void stop();
+  int beginMulticastPacket();
+  int beginPacket();
+  int beginPacket(IPAddress ip, uint16_t port);
+  int beginPacket(const char *host, uint16_t port);
+  int endPacket();
+  size_t write(uint8_t);
+  size_t write(const uint8_t *buffer, size_t size);
+  int parsePacket();
+  int available();
+  int read();
+  int read(unsigned char* buffer, size_t len);
+  int read(char* buffer, size_t len);
+  int peek();
+  void flush();
+  IPAddress remoteIP();
+  uint16_t remotePort();
 };
 
-#endif // WIFIUDP_H
+#endif /* _WIFIUDP_H_ */

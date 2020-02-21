@@ -1,6 +1,6 @@
 /*
-  This file is part of the Arduino NINA firmware.
-  Copyright (c) 2018 Arduino SA. All rights reserved.
+  Server.h - Server class for Raspberry Pi
+  Copyright (c) 2016 Hristo Gochkov  All right reserved.
 
   This library is free software; you can redistribute it and/or
   modify it under the terms of the GNU Lesser General Public
@@ -14,37 +14,47 @@
 
   You should have received a copy of the GNU Lesser General Public
   License along with this library; if not, write to the Free Software
-  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
+#ifndef _WIFISERVER_H_
+#define _WIFISERVER_H_
 
-#ifndef WIFISERVER_H
-#define WIFISERVER_H
+#include "Arduino.h"
+#include "Server.h"
+#include "WiFiClient.h"
 
-#include <sdkconfig.h>
+class WiFiServer : public Server {
+  private:
+    int sockfd;
+    int _accepted_sockfd = -1;
+    uint16_t _port;
+    uint8_t _max_clients;
+    bool _listening;
+    bool _noDelay = false;
 
-#include <Arduino.h>
-// #include <Server.h>
+  public:
+    void listenOnLocalhost(){}
 
-class WiFiClient;
+    WiFiServer(uint16_t port=80, uint8_t max_clients=4):sockfd(-1),_accepted_sockfd(-1),_port(port),_max_clients(max_clients),_listening(false),_noDelay(false){}
+    ~WiFiServer(){ end();}
+    WiFiClient available();
+    WiFiClient accept(){return available();}
+    void begin(uint16_t port=0);
+    void setNoDelay(bool nodelay);
+    bool getNoDelay();
+    bool hasClient();
+    size_t write(const uint8_t *data, size_t len);
+    size_t write(uint8_t data){
+      return write(&data, 1);
+    }
+    using Print::write;
 
-class WiFiServer /*: public Server*/ {
-public:
-  WiFiServer();
-  WiFiServer(uint16_t);
-  WiFiClient available(uint8_t* status = NULL);
-  void begin();
-  virtual size_t write(uint8_t);
-  virtual size_t write(const uint8_t *buf, size_t size);
-  uint8_t status();
-
-  // using Print::write;
-
-  virtual operator bool();
-
-private:
-  uint16_t _port;
-  int _socket;
-  int _spawnedSockets[CONFIG_LWIP_MAX_SOCKETS];
+    void end();
+    void close();
+    void stop();
+    operator bool(){return _listening;}
+    int setTimeout(uint32_t seconds);
+    void stopAll();
 };
 
-#endif // WIFISERVER_H
+#endif /* _WIFISERVER_H_ */

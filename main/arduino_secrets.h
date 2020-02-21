@@ -6,3 +6,5 @@
 
 // Fill in the device id
 #define SECRET_DEVICE_ID "arduinoEsp"
+
+#define SECRET_DEVICE_KEY "OPJ5OPIWLRTJMEJVV6YS"

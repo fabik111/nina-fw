@@ -31,7 +31,7 @@ const char FIRMWARE_VERSION[6] = "1.3.0";
 #ifdef ARDUINO_NINA_ESP32
 extern char CUSTOMCIAO[5];
 #endif
-/*IPAddress*/uint32_t resolvedHostname;
+IPAddress/*uint32_t*/ resolvedHostname;
 
 #define MAX_SOCKETS CONFIG_LWIP_MAX_SOCKETS
 uint8_t socketTypes[MAX_SOCKETS];
@@ -123,7 +123,7 @@ int setDNSconfig(const uint8_t command[], uint8_t response[])
   memcpy(&dns1, &command[6], sizeof(dns1));
   memcpy(&dns2, &command[11], sizeof(dns2));
 
-  WiFi.setDNS(dns1, dns2);
+  //WiFi.setDNS(dns1, dns2);
 
   response[2] = 1; // number of parameters
   response[3] = 1; // parameter 1 length
@@ -143,7 +143,7 @@ int setHostname(const uint8_t command[], uint8_t response[])
   response[3] = 1; // parameter 1 length
   response[4] = 1;
 
-  WiFi.hostname(hostname);
+  WiFi.setHostname(hostname);
 
   return 6;
 }
@@ -152,10 +152,10 @@ int setPowerMode(const uint8_t command[], uint8_t response[])
 {
   if (command[4]) {
     // low power
-    WiFi.lowPowerMode();
+    //WiFi.lowPowerMode();
   } else {
     // no low power
-    WiFi.noLowPowerMode();
+    //WiFi.noLowPowerMode();
   }
 
   response[2] = 1; // number of parameters
@@ -178,12 +178,12 @@ int setApNet(const uint8_t command[], uint8_t response[])
   response[2] = 1; // number of parameters
   response[3] = 1; // parameter 1 length
 
-  if (WiFi.beginAP(ssid, channel) != WL_AP_FAILED) {
+  /*if (WiFi.beginAP(ssid, channel) != WL_AP_FAILED) {
     response[4] = 1;
   } else {
     response[4] = 0;
   }
-
+  */
   return 6;
 }
 
@@ -203,12 +203,12 @@ int setApPassPhrase(const uint8_t command[], uint8_t response[])
   response[2] = 1; // number of parameters
   response[3] = 1; // parameter 1 length
 
-  if (WiFi.beginAP(ssid, pass, channel) != WL_AP_FAILED) {
+  /*if (WiFi.beginAP(ssid, pass, channel) != WL_AP_FAILED) {
     response[4] = 1;
   } else {
     response[4] = 0;
   }
-
+  */
   return 6;
 }
 
@@ -243,7 +243,7 @@ int getTemperature(const uint8_t command[], uint8_t response[])
 
 int getReasonCode(const uint8_t command[], uint8_t response[])
 {
-  uint8_t reasonCode = WiFi.reasonCode();
+  uint8_t reasonCode =  0;//WiFi.reasonCode();
 
   response[2] = 1; // number of parameters
   response[3] = 1; // parameter 1 length
@@ -300,7 +300,7 @@ int getMACaddr(const uint8_t command[], uint8_t response[])
 int getCurrSSID(const uint8_t command[], uint8_t response[])
 {
   // ssid
-  const char* ssid = WiFi.SSID();
+  const char* ssid = WiFi.SSID().c_str();
   uint8_t ssidLen = strlen(ssid);
 
   response[2] = 1; // number of parameters
@@ -313,9 +313,9 @@ int getCurrSSID(const uint8_t command[], uint8_t response[])
 
 int getCurrBSSID(const uint8_t command[], uint8_t response[])
 {
-  uint8_t bssid[6];
+  uint8_t* bssid;
 
-  WiFi.BSSID(bssid);
+  bssid = WiFi.BSSID(0);
 
   response[2] = 1; // number of parameters
   response[3] = 6; // parameter 1 length
@@ -339,7 +339,7 @@ int getCurrRSSI(const uint8_t command[], uint8_t response[])
 
 int getCurrEnct(const uint8_t command[], uint8_t response[])
 {
-  uint8_t encryptionType = WiFi.encryptionType();
+  uint8_t encryptionType = WiFi.encryptionType(0);
 
   response[2] = 1; // number of parameters
   response[3] = 1; // parameter 1 length
@@ -356,7 +356,7 @@ int scanNetworks(const uint8_t command[], uint8_t response[])
   response[2] = num;
 
   for (int i = 0; i < num; i++) {
-    const char* ssid = WiFi.SSID(i);
+    const char* ssid = WiFi.SSID(i).c_str();
     int ssidLen = strlen(ssid);
 
     response[responseLength++] = ssidLen;
@@ -719,7 +719,7 @@ int reqHostByName(const uint8_t command[], uint8_t response[])
   response[2] = 1; // number of parameters
   response[3] = 1; // parameter 1 length
 
-  resolvedHostname = /*IPAddress(255, 255, 255, 255)*/0xffffffff;
+  resolvedHostname = IPAddress(255, 255, 255, 255)/*0xffffffff*/;
   if (WiFi.hostByName(host, resolvedHostname)) {
     response[4] = 1;
   } else {
@@ -828,7 +828,7 @@ int getIdxBSSID(const uint8_t command[], uint8_t response[])
 {
   uint8_t bssid[6];
 
-  WiFi.BSSID(command[4], bssid);
+  //WiFi.BSSID(command[4], bssid);
 
   response[2] = 1; // number of parameters
   response[3] = 6; // parameter 1 length
@@ -916,7 +916,7 @@ int setEnt(const uint8_t command[], uint8_t response[])
     rootCA = (const char*)commandPtr;
     commandPtr += rootCALen;
 
-    WiFi.beginEnterprise(ssid, username, password, identity, rootCA);
+    //WiFi.beginEnterprise(ssid, username, password, identity, rootCA);
   } else {
     // EAP-TLS
     const char* cert;
@@ -958,7 +958,7 @@ int setEnt(const uint8_t command[], uint8_t response[])
     rootCA = (const char*)commandPtr;
     commandPtr += rootCALen;
 
-    WiFi.beginEnterpriseTLS(ssid, cert, key, identity, rootCA);
+    //WiFi.beginEnterpriseTLS(ssid, cert, key, identity, rootCA);
   }
 
   response[2] = 1; // number of parameters
@@ -1051,7 +1051,7 @@ int ping(const uint8_t command[], uint8_t response[])
   memcpy(&ip, &command[4], sizeof(ip));
   ttl = command[9];
 
-  result = WiFi.ping(ip, ttl);
+  //result = WiFi.ping(ip, ttl);
 
   response[2] = 1; // number of parameters
   response[3] = sizeof(result); // parameter 1 length
@@ -1159,8 +1159,8 @@ void CommandHandlerClass::begin()
 
   _updateGpio0PinSemaphore = xSemaphoreCreateCounting(2, 0);
 
-  WiFi.onReceive(CommandHandlerClass::onWiFiReceive);
-  WiFi.onDisconnect(CommandHandlerClass::onWiFiDisconnect);
+  //WiFi.onReceive(CommandHandlerClass::onWiFiReceive);
+  //WiFi.onDisconnect(CommandHandlerClass::onWiFiDisconnect);
 
   xTaskCreatePinnedToCore(CommandHandlerClass::gpio0Updater, "gpio0Updater", 8192, NULL, 1, NULL, 1);
 }
@@ -1218,11 +1218,11 @@ void CommandHandlerClass::updateGpio0Pin()
       }
     }
 
-    if (socketTypes[i] == 0x01 && udps[i] && (udps[i].available() || udps[i].parsePacket())) {
+  /*  if (socketTypes[i] == 0x01 && udps[i] != NULL && (udps[i].available() || udps[i].parsePacket())) {
       available = 1;
       break;
     }
-
+*/
     if (socketTypes[i] == 0x02 && tlsClients[i] && tlsClients[i].connected() && tlsClients[i].available()) {
       available = 1;
       break;
