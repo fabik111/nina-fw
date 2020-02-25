@@ -25,6 +25,10 @@
 #include <WiFiSSLClient.h>
 #include <WiFiUdp.h>
 
+#include "arduino_secrets.h"
+#include <ArduinoIoTCloud.h>
+#include <Arduino_ConnectionHandler.h>
+
 #include "CommandHandler.h"
 
 const char FIRMWARE_VERSION[6] = "1.3.0";
@@ -1120,6 +1124,71 @@ int setAnalogWrite(const uint8_t command[], uint8_t response[])
   return 6;
 }
 
+int iotBegin(const uint8_t command[], uint8_t response[])
+{
+  char ssid[32 + 1];
+  char pass[64 + 1];
+  char mqtt[64 + 1];
+
+  memset(ssid, 0x00, sizeof(ssid));
+  memset(pass, 0x00, sizeof(pass));
+  memset(mqtt, 0x00, sizeof(mqtt));
+
+  memcpy(ssid, &command[4], command[3]);
+  memcpy(pass, &command[5 + command[3]], command[4 + command[3]]);
+  memcpy(pass, &command[6 + command[5 + command[3] + command[4 + command[3]]]], command[5 + command[3] + command[4 + command[3]]]);
+
+  ArduinoCloud.begin(ssid, pass, mqtt);
+
+  response[2] = 1; // number of parameters
+  response[3] = 1; // parameter 1 length
+  response[4] = 1;
+
+  return 6;
+}
+
+int iotUpdate(const uint8_t command[], uint8_t response[])
+{
+  ArduinoCloud.update();
+
+  response[2] = 1; // number of parameters
+  response[3] = 1; // parameter 1 length
+  response[4] = 1;
+
+  return 6;
+}
+
+int iotAddProperty(const uint8_t command[], uint8_t response[])
+{
+  uint8_t property_type;
+
+  char name[32 + 1];
+  
+  uint8_t permission;
+  uint8_t seconds;
+
+  property_type = command[4];
+
+  memset(name, 0x00, sizeof(name));
+  memcpy(name, &command[6], command[5]);
+
+  int start_pos = 6 + command[5];
+  permission = command[start_pos];
+  seconds = command[start_pos + 2];
+
+  switch (property_type) {
+    case 1: { bool * property_bool = new bool(); ArduinoCloud.addPropertyReal(*property_bool, String(name), (permissionType)permission, (long)seconds);} break;
+    case 2: { int * property_int = new int(); ArduinoCloud.addPropertyReal(*property_int, String(name), (permissionType)permission, (long)seconds);} break;
+    case 3: { float * property_float = new float(); ArduinoCloud.addPropertyReal(*property_float, String(name), (permissionType)permission, (long)seconds);} break;
+    case 4: { String * property_string = new String(); ArduinoCloud.addPropertyReal(*property_string, String(name), (permissionType)permission, (long)seconds);} break;
+  }
+
+  response[2] = 1; // number of parameters
+  response[3] = 1; // parameter 1 length
+  response[4] = 1;
+
+  return 6;
+}
 
 typedef int (*CommandHandlerType)(const uint8_t command[], uint8_t response[]);
 
@@ -1140,7 +1209,10 @@ const CommandHandlerType commandHandlers[] = {
   setEnt, NULL, NULL, NULL, sendDataTcp, getDataBufTcp, insertDataBuf, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 
   // 0x50 -> 0x5f
-  setPinMode, setDigitalWrite, setAnalogWrite,
+  setPinMode, setDigitalWrite, setAnalogWrite, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+  
+  // 0x60 -> 0x6f
+  iotBegin, iotUpdate, iotAddProperty, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 };
 
 #define NUM_COMMAND_HANDLERS (sizeof(commandHandlers) / sizeof(commandHandlers[0]))
