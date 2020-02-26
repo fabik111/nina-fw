@@ -21,6 +21,11 @@
 #define COMMAND_HANDLER_H
 
 #include <stdint.h>
+#include <LinkedList.h>
+#include <CloudBool.h>
+#include <CloudFloat.h>
+#include <CloudInt.h>
+#include <CloudString.h>
 
 class CommandHandlerClass {
 public:
@@ -30,6 +35,9 @@ public:
   int handle(const uint8_t command[], uint8_t response[]);
 
 private:
+
+
+
   static void gpio0Updater(void*);
   void updateGpio0Pin();
 

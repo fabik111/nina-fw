@@ -37,6 +37,8 @@ extern char CUSTOMCIAO[5];
 #endif
 /*IPAddress*/uint32_t resolvedHostname;
 
+LinkedList<ArduinoCloudProperty *> _global_property_list;
+
 #define MAX_SOCKETS CONFIG_LWIP_MAX_SOCKETS
 uint8_t socketTypes[MAX_SOCKETS];
 WiFiClient tcpClients[MAX_SOCKETS];
@@ -1138,7 +1140,8 @@ int iotBegin(const uint8_t command[], uint8_t response[])
   memcpy(pass, &command[5 + command[3]], command[4 + command[3]]);
   memcpy(pass, &command[6 + command[5 + command[3] + command[4 + command[3]]]], command[5 + command[3] + command[4 + command[3]]]);
 
-  ArduinoCloud.begin(ssid, pass, mqtt);
+  WiFiConnectionHandler ArduinoIoTPreferredConnection(ssid, pass);
+  ArduinoCloud.begin(ArduinoIoTPreferredConnection , mqtt);
 
   response[2] = 1; // number of parameters
   response[3] = 1; // parameter 1 length
@@ -1163,7 +1166,7 @@ int iotAddProperty(const uint8_t command[], uint8_t response[])
   uint8_t property_type;
 
   char name[32 + 1];
-  
+
   uint8_t permission;
   uint8_t seconds;
 
@@ -1177,10 +1180,34 @@ int iotAddProperty(const uint8_t command[], uint8_t response[])
   seconds = command[start_pos + 2];
 
   switch (property_type) {
-    case 1: { bool * property_bool = new bool(); ArduinoCloud.addPropertyReal(*property_bool, String(name), (permissionType)permission, (long)seconds);} break;
-    case 2: { int * property_int = new int(); ArduinoCloud.addPropertyReal(*property_int, String(name), (permissionType)permission, (long)seconds);} break;
-    case 3: { float * property_float = new float(); ArduinoCloud.addPropertyReal(*property_float, String(name), (permissionType)permission, (long)seconds);} break;
-    case 4: { String * property_string = new String(); ArduinoCloud.addPropertyReal(*property_string, String(name), (permissionType)permission, (long)seconds);} break;
+    case 1: {
+      CloudBool *property_bool = new CloudBool();
+      property_bool->init(String(name), (Permission)permission);
+      _global_property_list.add(property_bool);
+      ArduinoCloud.addPropertyReal(*property_bool, String(name), (permissionType)permission, (long)seconds);
+      }
+      break;
+    case 2: {
+      CloudInt *property_int = new CloudInt();
+      property_int->init(String(name), (Permission)permission);
+      _global_property_list.add(property_int);
+      ArduinoCloud.addPropertyReal(*property_int, String(name), (permissionType)permission, (long)seconds);
+      }
+      break;
+    case 3: {
+      CloudFloat  * property_float = new CloudFloat();
+      property_float->init(String(name), (Permission)permission);
+      _global_property_list.add(property_float);
+      ArduinoCloud.addPropertyReal(*property_float, String(name), (permissionType)permission, (long)seconds);
+      }
+      break;
+    case 4: {
+      CloudString * property_string = new CloudString();
+      property_string->init(String(name), (Permission)permission);
+      _global_property_list.add(property_string);
+      ArduinoCloud.addPropertyReal(*property_string, String(name), (permissionType)permission, (long)seconds);
+      }
+      break;
   }
 
   response[2] = 1; // number of parameters
@@ -1210,7 +1237,7 @@ const CommandHandlerType commandHandlers[] = {
 
   // 0x50 -> 0x5f
   setPinMode, setDigitalWrite, setAnalogWrite, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-  
+
   // 0x60 -> 0x6f
   iotBegin, iotUpdate, iotAddProperty, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 };
