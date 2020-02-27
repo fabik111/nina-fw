@@ -1126,7 +1126,24 @@ int setAnalogWrite(const uint8_t command[], uint8_t response[])
 
   return 6;
 }
+/*
+  Arduino IoT Cloud methods:
+    IOT_BEGIN		= 0x60,
+    IOT_UPDATE	= 0x61,
+    IOT_ADD_PROPERTY	= 0x62,
+    IOT_UPDATE_BOOL = 0x63,
+    IOT_UPDATE_INT = 0x64,
+    IOT_UPDATE_FLOAT = 0x65,
+    IOT_UPDATE_STRING = 0x66,
+    IOT_READ_BOOL = 0x67,
+    IOT_READ_INT = 0x68,
+    IOT_READ_FLOAT = 0x69,
+    IOT_READ_STRING = 0x6A,
+    IOT_SET_THING_ID = 0x6B,
+    IOT_SET_BOARD_ID = 0x6C,
+    IOT_SET_SECRET_KEY = 0x6D,
 
+*/
 int iotBegin(const uint8_t command[], uint8_t response[])
 {
   char ssid[32 + 1];
@@ -1333,6 +1350,98 @@ int iotUpdateString(const uint8_t command[], uint8_t response[])
   return 6;
 }
 
+//0x67
+int iotReadBool(const uint8_t command[], uint8_t response[])
+{
+  char propertyName[command[3]];
+
+  memset(propertyName, 0x00, sizeof(propertyName));
+  memcpy(propertyName, &command[4], command[3]);
+
+  CloudBool *prop =  (CloudBool *)getPropertyObj(String(propertyName));
+  response[2] = 1; // number of parameters
+
+  if(prop){
+    bool val = *prop;
+    response[3] = sizeof(val); // parameter 1 length
+    response[4] = val;
+    return 5 + sizeof(val);
+  }
+
+  response[3] = 1;
+  response[4] = 0;
+  return 6;
+}
+
+//0x68
+int iotReadInt(const uint8_t command[], uint8_t response[])
+{
+  char propertyName[command[3]];
+
+  memset(propertyName, 0x00, sizeof(propertyName));
+  memcpy(propertyName, &command[4], command[3]);
+
+  CloudInt *prop =  (CloudInt *)getPropertyObj(String(propertyName));
+  response[2] = 1; // number of parameters
+
+  if(prop){
+    int val = *prop;
+    response[3] = sizeof(val); // parameter 1 length
+    memcpy(&response[4], &val, sizeof(val));
+    return 5 + sizeof(val);
+  }
+
+  response[3] = 1;
+  response[4] = 0;
+  return 6;
+}
+
+//0x69
+int iotReadFloat(const uint8_t command[], uint8_t response[])
+{
+  char propertyName[command[3]];
+
+  memset(propertyName, 0x00, sizeof(propertyName));
+  memcpy(propertyName, &command[4], command[3]);
+
+  CloudFloat *prop =  (CloudFloat *)getPropertyObj(String(propertyName));
+  response[2] = 1; // number of parameters
+
+  if(prop){
+    float val = *prop;
+    response[3] = sizeof(val); // parameter 1 length
+    memcpy(&response[4], &val, sizeof(val));
+    return 5 + sizeof(val);
+  }
+
+  response[3] = 1;
+  response[4] = 0;
+  return 6;
+}
+
+//0x6A
+int iotReadString(const uint8_t command[], uint8_t response[])
+{
+  char propertyName[command[3]];
+
+  memset(propertyName, 0x00, sizeof(propertyName));
+  memcpy(propertyName, &command[4], command[3]);
+
+  CloudString *prop =  (CloudString *)getPropertyObj(String(propertyName));
+  response[2] = 1; // number of parameters
+
+  if(prop){
+    String val = *prop;
+    response[3] = sizeof(val); // parameter 1 length
+    memcpy(&response[4], &val, sizeof(val));
+    return 5 + sizeof(val);
+  }
+
+  response[3] = 1;
+  response[4] = 0;
+  return 6;
+}
+
 //0x6B
 int iotSetThingID(const uint8_t command[], uint8_t response[])
 {
@@ -1403,24 +1512,9 @@ const CommandHandlerType commandHandlers[] = {
 
   // 0x50 -> 0x5f
   setPinMode, setDigitalWrite, setAnalogWrite, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-  /*
-    IOT_BEGIN		= 0x60,
-		IOT_UPDATE	= 0x61,
-		IOT_ADD_PROPERTY	= 0x62,
-		IOT_UPDATE_BOOL = 0x63,
-		IOT_UPDATE_INT = 0x64,
-		IOT_UPDATE_FLOAT = 0x65,
-		IOT_UPDATE_STRING = 0x66,
-		IOT_READ_BOOL = 0x67,
-		IOT_READ_INT = 0x68,
-		IOT_READ_FLOAT = 0x69,
-		IOT_READ_STRING = 0x6A,
-		IOT_SET_THING_ID = 0x6B,
-		IOT_SET_BOARD_ID = 0x6C,
-		IOT_SET_SECRET_KEY = 0x6D,
-  */
+
   // 0x60 -> 0x6f
-  iotBegin, iotUpdate, iotAddProperty, iotUpdateBool, iotUpdateInt, iotUpdateFloat, iotUpdateString, NULL, NULL, NULL, NULL, NULL, iotSetThingID, iotSetBoardId, iotSetSecretDeviceKey,  NULL,
+  iotBegin, iotUpdate, iotAddProperty, iotUpdateBool, iotUpdateInt, iotUpdateFloat, iotUpdateString, iotReadBool, iotReadInt, iotReadFloat, iotReadString, iotSetThingID, iotSetBoardId, iotSetSecretDeviceKey, NULL, NULL,
 };
 
 #define NUM_COMMAND_HANDLERS (sizeof(commandHandlers) / sizeof(commandHandlers[0]))
