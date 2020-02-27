@@ -1171,12 +1171,18 @@ int iotBegin(const uint8_t command[], uint8_t response[])
 int iotUpdate(const uint8_t command[], uint8_t response[])
 {
   ArduinoCloud.update();
+  uint8_t iotStatus = (uint8_t)ArduinoCloud.getIoTStatus();
+  uint8_t syncStatus = (uint8_t)ArduinoCloud.getIoTSyncStatus();
+  uint8_t connStatus = (uint8_t)ArduinoIoTPreferredConnection->getStatus();
 
-  response[2] = 1; // number of parameters
+  response[2] = 3; // number of parameters
   response[3] = 1; // parameter 1 length
-  response[4] = 1;
-
-  return 6;
+  response[4] = iotStatus;
+  response[5] = 1;
+  response[6] = syncStatus;
+  response[7] = 1;
+  response[8] = connStatus;
+  return 10;
 }
 
 int iotAddProperty(const uint8_t command[], uint8_t response[])
