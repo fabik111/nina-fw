@@ -1206,28 +1206,28 @@ int iotAddProperty(const uint8_t command[], uint8_t response[])
   switch (property_type) {
     case 1: {
       CloudBool *property_bool = new CloudBool();
-      property_bool->init(String(name), (Permission)permission);
+      property_bool->init(String(name), (Permission)permission, NULL);
       _global_property_list.add(property_bool);
       ArduinoCloud.addPropertyReal(*property_bool, String(name), (permissionType)permission, (long)seconds);
       }
       break;
     case 2: {
       CloudInt *property_int = new CloudInt();
-      property_int->init(String(name), (Permission)permission);
+      property_int->init(String(name), (Permission)permission, NULL);
       _global_property_list.add(property_int);
       ArduinoCloud.addPropertyReal(*property_int, String(name), (permissionType)permission, (long)seconds);
       }
       break;
     case 3: {
       CloudFloat  * property_float = new CloudFloat();
-      property_float->init(String(name), (Permission)permission);
+      property_float->init(String(name), (Permission)permission, NULL);
       _global_property_list.add(property_float);
       ArduinoCloud.addPropertyReal(*property_float, String(name), (permissionType)permission, (long)seconds);
       }
       break;
     case 4: {
       CloudString * property_string = new CloudString();
-      property_string->init(String(name), (Permission)permission);
+      property_string->init(String(name), (Permission)permission, NULL);
       _global_property_list.add(property_string);
       ArduinoCloud.addPropertyReal(*property_string, String(name), (permissionType)permission, (long)seconds);
       }
