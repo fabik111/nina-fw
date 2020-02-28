@@ -76,6 +76,38 @@ int WiFiClient::connect(IPAddress ip, uint16_t port)
   return 1;
 }
 
+int WiFiClient::connect(uint32_t ip, uint16_t port)
+{
+  Serial.print("connect uint32 to ");
+  Serial.println(ip);
+  _socket = lwip_socket(AF_INET, SOCK_STREAM, 0);
+
+  if (_socket < 0) {
+    Serial.println("finite le socket");
+    _socket = -1;
+    return 0;
+  }
+
+  struct sockaddr_in addr;
+  memset(&addr, 0x00, sizeof(addr));
+
+  addr.sin_family = AF_INET;
+  addr.sin_addr.s_addr = (uint32_t)ip;
+  addr.sin_port = htons(port);
+
+  if (lwip_connect_r(_socket, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+    Serial.println("connect failed");
+    lwip_close_r(_socket);
+    _socket = -1;
+    return 0;
+  }
+
+  int nonBlocking = 1;
+  lwip_ioctl_r(_socket, FIONBIO, &nonBlocking);
+Serial.println("connect succed");
+  return 1;
+}
+
 size_t WiFiClient::write(uint8_t b)
 {
   return write(&b, 1);
@@ -131,7 +163,7 @@ int WiFiClient::read(uint8_t* buf, size_t size)
   if (!available()) {
     return -1;
   }
-
+  Serial.println("read data from wifi");
   int result = lwip_recv_r(_socket, buf, size, MSG_DONTWAIT);
 
   if (result <= 0 && errno != EWOULDBLOCK) {
@@ -195,7 +227,17 @@ bool WiFiClient::operator==(const WiFiClient &other) const
   return (_socket == other._socket);
 }
 
-IPAddress WiFiClient::remoteIP()
+/*IPAddress WiFiClient::remoteIP()
+{
+  struct sockaddr_storage addr;
+  socklen_t len = sizeof(addr);
+
+  getpeername(_socket, (struct sockaddr*)&addr, &len);
+
+  return ((struct sockaddr_in *)&addr)->sin_addr.s_addr;
+}*/
+
+uint32_t WiFiClient::remoteIP()
 {
   struct sockaddr_storage addr;
   socklen_t len = sizeof(addr);
