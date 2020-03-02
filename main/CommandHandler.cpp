@@ -1191,6 +1191,20 @@ int CommandHandlerClass::handle(const uint8_t command[], uint8_t response[])
 
   xSemaphoreGive(_updateGpio0PinSemaphore);
 
+  Serial.print("The command is:");
+  for(int i = 0; i < command[2]; i++)
+  {
+    Serial.print(command[i], HEX);
+  }
+  Serial.println();
+
+  Serial.print("The response is:");
+  for(int i = 0; i < responseLength; i++)
+  {
+    Serial.print(response[i], HEX);
+  }
+  Serial.println();
+
   return responseLength;
 }
 
