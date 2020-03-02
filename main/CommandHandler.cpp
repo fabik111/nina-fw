@@ -25,6 +25,10 @@
 #include <WiFiSSLClient.h>
 #include <WiFiUdp.h>
 
+#include "arduino_secrets.h"
+#include <ArduinoIoTCloud.h>
+#include <Arduino_ConnectionHandler.h>
+
 #include "CommandHandler.h"
 
 const char FIRMWARE_VERSION[6] = "1.3.0";
@@ -32,6 +36,14 @@ const char FIRMWARE_VERSION[6] = "1.3.0";
 extern char CUSTOMCIAO[5];
 #endif
 IPAddress/*uint32_t*/ resolvedHostname;
+
+LinkedList<ArduinoCloudProperty *> _global_property_list;
+WiFiConnectionHandler *ArduinoIoTPreferredConnection;
+char ssid[32 + 1];
+char pass[64 + 1];
+char mqtt[64 + 1];
+char thingId[36];
+
 
 #define MAX_SOCKETS CONFIG_LWIP_MAX_SOCKETS
 uint8_t socketTypes[MAX_SOCKETS];
@@ -183,7 +195,7 @@ int setApNet(const uint8_t command[], uint8_t response[])
   } else {
     response[4] = 0;
   }
-  */
+*/
   return 6;
 }
 
@@ -1119,6 +1131,384 @@ int setAnalogWrite(const uint8_t command[], uint8_t response[])
 
   return 6;
 }
+/*
+  Arduino IoT Cloud methods:
+    IOT_BEGIN		= 0x60,
+    IOT_UPDATE	= 0x61,
+    IOT_ADD_PROPERTY	= 0x62,
+    IOT_UPDATE_BOOL = 0x63,
+    IOT_UPDATE_INT = 0x64,
+    IOT_UPDATE_FLOAT = 0x65,
+    IOT_UPDATE_STRING = 0x66,
+    IOT_READ_BOOL = 0x67,
+    IOT_READ_INT = 0x68,
+    IOT_READ_FLOAT = 0x69,
+    IOT_READ_STRING = 0x6A,
+    IOT_SET_THING_ID = 0x6B,
+    IOT_SET_BOARD_ID = 0x6C,
+    IOT_SET_SECRET_KEY = 0x6D,
+
+*/
+int iotBegin(const uint8_t command[], uint8_t response[])
+{
+
+
+  memset(ssid, 0x00, sizeof(ssid));
+  memset(pass, 0x00, sizeof(pass));
+  memset(mqtt, 0x00, sizeof(mqtt));
+
+  memcpy(ssid, &command[4], command[3]);
+  memcpy(pass, &command[5 + command[3]], command[4 + command[3]]);
+  uint8_t dim_first_param = command[3];
+  uint8_t dim_second_param = command[4 + command[3]];
+  memcpy(mqtt, &command[6 + dim_first_param + dim_second_param], command[5 + dim_first_param + dim_second_param]);
+  Serial.print("ssid arrived: ");
+  Serial.println(ssid);
+  Serial.print("pass arrived: ");
+  Serial.println(pass);
+  Serial.print("mqtt arrived: ");
+  Serial.println(mqtt);
+  ArduinoIoTPreferredConnection = new WiFiConnectionHandler(ssid, pass);
+  ArduinoCloud.begin(*ArduinoIoTPreferredConnection , mqtt);
+
+  response[2] = 1; // number of parameters
+  response[3] = 1; // parameter 1 length
+  response[4] = 1;
+
+  return 6;
+}
+
+int iotUpdate(const uint8_t command[], uint8_t response[])
+{
+  ArduinoCloud.update();
+  uint8_t iotStatus = (uint8_t)ArduinoCloud.getIoTStatus();
+  uint8_t syncStatus = (uint8_t)ArduinoCloud.getIoTSyncStatus();
+  uint8_t connStatus = (uint8_t)ArduinoIoTPreferredConnection->getStatus();
+
+  response[2] = 3; // number of parameters
+  response[3] = 1; // parameter 1 length
+  response[4] = iotStatus;
+  response[5] = 1;
+  response[6] = syncStatus;
+  response[7] = 1;
+  response[8] = connStatus;
+  return 10;
+}
+
+int iotAddProperty(const uint8_t command[], uint8_t response[])
+{
+  uint8_t property_type;
+
+  char name[32 + 1];
+
+  uint8_t permission;
+  uint8_t seconds;
+
+  property_type = command[4];
+
+  memset(name, 0x00, sizeof(name));
+  memcpy(name, &command[6], command[5]);
+
+  int start_pos = 6 + command[5];
+  permission = command[start_pos];
+  seconds = command[start_pos + 2];
+
+  switch (property_type) {
+    case 1: {
+      CloudBool *property_bool = new CloudBool();
+      property_bool->init(String(name), (Permission)permission, NULL);
+      _global_property_list.add(property_bool);
+      ArduinoCloud.addPropertyReal(*property_bool, String(name), (permissionType)permission, (long)seconds);
+      }
+      break;
+    case 2: {
+      CloudInt *property_int = new CloudInt();
+      property_int->init(String(name), (Permission)permission, NULL);
+      _global_property_list.add(property_int);
+      ArduinoCloud.addPropertyReal(*property_int, String(name), (permissionType)permission, (long)seconds);
+      }
+      break;
+    case 3: {
+      CloudFloat  * property_float = new CloudFloat();
+      property_float->init(String(name), (Permission)permission, NULL);
+      _global_property_list.add(property_float);
+      ArduinoCloud.addPropertyReal(*property_float, String(name), (permissionType)permission, (long)seconds);
+      }
+      break;
+    case 4: {
+      CloudString * property_string = new CloudString();
+      property_string->init(String(name), (Permission)permission, NULL);
+      _global_property_list.add(property_string);
+      ArduinoCloud.addPropertyReal(*property_string, String(name), (permissionType)permission, (long)seconds);
+      }
+      break;
+  }
+
+  response[2] = 1; // number of parameters
+  response[3] = 1; // parameter 1 length
+  response[4] = 1;
+
+  return 6;
+}
+
+ArduinoCloudProperty * getPropertyObj(String name){
+  for(int i=0; i<_global_property_list.size(); i++){
+    ArduinoCloudProperty *prop = _global_property_list.get(i);
+    if(prop->name() == name){
+      return prop;
+    }
+  }
+  return NULL;
+}
+
+//0x63
+int iotUpdateBool(const uint8_t command[], uint8_t response[])
+{
+  char propertyName[command[3]];
+
+  memset(propertyName, 0x00, sizeof(propertyName));
+  memcpy(propertyName, &command[4], command[3]);
+
+  bool propertyValue;
+  memcpy(&propertyValue, &command[5 + command[3]], command[4 + command[3]] );
+
+  response[2] = 1; // number of parameters
+  response[3] = 1; // parameter 1 length
+  CloudBool *prop = (CloudBool *)getPropertyObj(String(propertyName));
+
+  if(prop){
+    *prop = propertyValue;
+    response[4] = 1;
+  }
+  else{
+    response[4] = 0;
+  }
+
+  return 6;
+}
+//0x64
+int iotUpdateInt(const uint8_t command[], uint8_t response[])
+{
+  char propertyName[command[3]];
+
+  memset(propertyName, 0x00, sizeof(propertyName));
+  memcpy(propertyName, &command[4], command[3]);
+
+  int propertyValue;
+  memcpy(&propertyValue, &command[5 + command[3]], command[4 + command[3]] );
+
+  response[2] = 1; // number of parameters
+  response[3] = 1; // parameter 1 length
+  CloudInt *prop =  (CloudInt *)getPropertyObj(String(propertyName));
+
+  if(prop){
+    *prop = propertyValue;
+    response[4] = 1;
+  }
+  else{
+    response[4] = 0;
+  }
+
+  return 6;
+}
+
+
+
+//0x65
+int iotUpdateFloat(const uint8_t command[], uint8_t response[])
+{
+  char propertyName[command[3]];
+
+  memset(propertyName, 0x00, sizeof(propertyName));
+  memcpy(propertyName, &command[4], command[3]);
+
+  float propertyValue;
+  memcpy(&propertyValue, &command[5 + command[3]], command[4 + command[3]] );
+
+  response[2] = 1; // number of parameters
+  response[3] = 1; // parameter 1 length
+  CloudFloat *prop = (CloudFloat *)getPropertyObj(String(propertyName));
+
+  if(prop){
+    *prop = propertyValue;
+    response[4] = 1;
+  }
+  else{
+    response[4] = 0;
+  }
+
+  return 6;
+}
+
+//0x66
+int iotUpdateString(const uint8_t command[], uint8_t response[])
+{
+  char propertyName[command[3]];
+
+  memset(propertyName, 0x00, sizeof(propertyName));
+  memcpy(propertyName, &command[4], command[3]);
+
+  String propertyValue;
+  memcpy(&propertyValue, &command[5 + command[3]], command[4 + command[3]] );
+
+  response[2] = 1; // number of parameters
+  response[3] = 1; // parameter 1 length
+  CloudString *prop =  (CloudString *)getPropertyObj(String(propertyName));
+
+  if(prop){
+    *prop = propertyValue;
+    response[4] = 1;
+  }
+  else{
+    response[4] = 0;
+  }
+
+  return 6;
+}
+
+//0x67
+int iotReadBool(const uint8_t command[], uint8_t response[])
+{
+  char propertyName[command[3]];
+
+  memset(propertyName, 0x00, sizeof(propertyName));
+  memcpy(propertyName, &command[4], command[3]);
+
+  CloudBool *prop =  (CloudBool *)getPropertyObj(String(propertyName));
+  response[2] = 1; // number of parameters
+
+  if(prop){
+    bool val = *prop;
+    response[3] = sizeof(val); // parameter 1 length
+    response[4] = val;
+    return 5 + sizeof(val);
+  }
+
+  response[3] = 1;
+  response[4] = 0;
+  return 6;
+}
+
+//0x68
+int iotReadInt(const uint8_t command[], uint8_t response[])
+{
+  char propertyName[command[3]];
+
+  memset(propertyName, 0x00, sizeof(propertyName));
+  memcpy(propertyName, &command[4], command[3]);
+
+  CloudInt *prop =  (CloudInt *)getPropertyObj(String(propertyName));
+  response[2] = 1; // number of parameters
+
+  if(prop){
+    int val = *prop;
+    response[3] = sizeof(val); // parameter 1 length
+    memcpy(&response[4], &val, sizeof(val));
+    return 5 + sizeof(val);
+  }
+
+  response[3] = 1;
+  response[4] = 0;
+  return 6;
+}
+
+//0x69
+int iotReadFloat(const uint8_t command[], uint8_t response[])
+{
+  char propertyName[command[3]];
+
+  memset(propertyName, 0x00, sizeof(propertyName));
+  memcpy(propertyName, &command[4], command[3]);
+
+  CloudFloat *prop =  (CloudFloat *)getPropertyObj(String(propertyName));
+  response[2] = 1; // number of parameters
+
+  if(prop){
+    float val = *prop;
+    response[3] = sizeof(val); // parameter 1 length
+    memcpy(&response[4], &val, sizeof(val));
+    return 5 + sizeof(val);
+  }
+
+  response[3] = 1;
+  response[4] = 0;
+  return 6;
+}
+
+//0x6A
+int iotReadString(const uint8_t command[], uint8_t response[])
+{
+  char propertyName[command[3]];
+
+  memset(propertyName, 0x00, sizeof(propertyName));
+  memcpy(propertyName, &command[4], command[3]);
+
+  CloudString *prop =  (CloudString *)getPropertyObj(String(propertyName));
+  response[2] = 1; // number of parameters
+
+  if(prop){
+    String val = *prop;
+    response[3] = sizeof(val); // parameter 1 length
+    memcpy(&response[4], &val, sizeof(val));
+    return 5 + sizeof(val);
+  }
+
+  response[3] = 1;
+  response[4] = 0;
+  return 6;
+}
+
+//0x6B
+int iotSetThingID(const uint8_t command[], uint8_t response[])
+{
+
+  memset(thingId, 0x00, sizeof(thingId));
+  memcpy(thingId, &command[4], command[3]);
+  Serial.print("thing id: ");
+  Serial.println(thingId);
+  ArduinoCloud.setThingId(thingId);
+
+  response[2] = 1; // number of parameters
+  response[3] = 1; // parameter 1 length
+  response[4] = 1;
+
+  return 6;
+}
+//0x6C
+int iotSetBoardId(const uint8_t command[], uint8_t response[])
+{
+  char boardId[command[3]];
+
+ memset(boardId, 0x00, sizeof(boardId));
+ memcpy(boardId, &command[4], command[3]);
+ Serial.print("board id: ");
+ Serial.println(boardId);
+  ArduinoCloud.setBoardId(boardId);
+
+  response[2] = 1; // number of parameters
+  response[3] = 1; // parameter 1 length
+  response[4] = 1;
+
+  return 6;
+}
+//0x6D
+int iotSetSecretDeviceKey(const uint8_t command[], uint8_t response[])
+{
+  char boardSecret[command[3]];
+
+ memset(boardSecret, 0x00, sizeof(boardSecret));
+ memcpy(boardSecret, &command[4], command[3]);
+  Serial.print("secret id: ");
+ Serial.println(boardSecret);
+  ArduinoCloud.setSecretDeviceKey(boardSecret);
+
+  response[2] = 1; // number of parameters
+  response[3] = 1; // parameter 1 length
+  response[4] = 1;
+
+  return 6;
+}
+
 
 
 typedef int (*CommandHandlerType)(const uint8_t command[], uint8_t response[]);
@@ -1140,7 +1530,10 @@ const CommandHandlerType commandHandlers[] = {
   setEnt, NULL, NULL, NULL, sendDataTcp, getDataBufTcp, insertDataBuf, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 
   // 0x50 -> 0x5f
-  setPinMode, setDigitalWrite, setAnalogWrite,
+  setPinMode, setDigitalWrite, setAnalogWrite, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+
+  // 0x60 -> 0x6f
+  iotBegin, iotUpdate, iotAddProperty, iotUpdateBool, iotUpdateInt, iotUpdateFloat, iotUpdateString, iotReadBool, iotReadInt, iotReadFloat, iotReadString, iotSetThingID, iotSetBoardId, iotSetSecretDeviceKey, NULL, NULL,
 };
 
 #define NUM_COMMAND_HANDLERS (sizeof(commandHandlers) / sizeof(commandHandlers[0]))
@@ -1191,7 +1584,7 @@ int CommandHandlerClass::handle(const uint8_t command[], uint8_t response[])
 
   xSemaphoreGive(_updateGpio0PinSemaphore);
 
-  Serial.print("The command is:");
+  /*Serial.print("The command is:");
   for(int i = 0; i < command[2]; i++)
   {
     Serial.print(command[i], HEX);
@@ -1203,7 +1596,7 @@ int CommandHandlerClass::handle(const uint8_t command[], uint8_t response[])
   {
     Serial.print(response[i], HEX);
   }
-  Serial.println();
+  Serial.println();*/
 
   return responseLength;
 }
@@ -1232,7 +1625,7 @@ void CommandHandlerClass::updateGpio0Pin()
       }
     }
 
-  /*  if (socketTypes[i] == 0x01 && udps[i] != NULL && (udps[i].available() || udps[i].parsePacket())) {
+  /*  if (socketTypes[i] == 0x01 && udps[i] && (udps[i].available() || udps[i].parsePacket())) {
       available = 1;
       break;
     }

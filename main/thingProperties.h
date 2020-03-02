@@ -2,7 +2,7 @@
 #include <Arduino_ConnectionHandler.h>
 
 
-const char THING_ID[] = "83a62d76-5338-4731-8b47-ac7180201a8a";
+const char THING_ID[] = "a8cc2b5a-cdb3-434f-815b-9a89c510c1c4";
 #define BOARD_ID "7c482e92-2bb7-48a5-a7c6-fa2de1f477ba"
 
 const char SSID[]     = SECRET_SSID;    // Network SSID (name)

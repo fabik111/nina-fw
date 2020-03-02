@@ -16,7 +16,7 @@
   License along with this library; if not, write to the Free Software
   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 */
-#include "arduino_secrets.h"
+
 #include <rom/uart.h>
 
 extern "C" {
@@ -30,40 +30,77 @@ extern "C" {
 #include <SPIS.h>
 #include <WiFi.h>
 
-#include "thingProperties.h"
+#include "CommandHandler.h"
 
 #define SPI_BUFFER_LEN SPI_MAX_DMA_LEN
 
 int debug = 0;
+
 char CUSTOMCIAO[5];
 
-unsigned long tf = 0;
+uint8_t* commandBuffer;
+uint8_t* responseBuffer;
+
+void dumpBuffer(const char* label, uint8_t data[], int length) {
+  ets_printf("%s: ", label);
+
+  for (int i = 0; i < length; i++) {
+    ets_printf("%02x", data[i]);
+  }
+
+  ets_printf("\r\n");
+}
+
+void setDebug(int d) {
+  debug = d;
+
+  if (debug) {
+    PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[1], 0);
+    PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[3], 0);
+
+    const char* default_uart_dev = "/dev/uart/0";
+    _GLOBAL_REENT->_stdin  = fopen(default_uart_dev, "r");
+    _GLOBAL_REENT->_stdout = fopen(default_uart_dev, "w");
+    _GLOBAL_REENT->_stderr = fopen(default_uart_dev, "w");
+
+    uart_div_modify(CONFIG_CONSOLE_UART_NUM, (APB_CLK_FREQ << 4) / 115200);
+
+    // uartAttach();
+    ets_install_uart_printf();
+    uart_tx_switch(CONFIG_CONSOLE_UART_NUM);
+  } else {
+    PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[1], PIN_FUNC_GPIO);
+    PIN_FUNC_SELECT(GPIO_PIN_MUX_REG[3], PIN_FUNC_GPIO);
+
+    _GLOBAL_REENT->_stdin  = (FILE*) &__sf_fake_stdin;
+    _GLOBAL_REENT->_stdout = (FILE*) &__sf_fake_stdout;
+    _GLOBAL_REENT->_stderr = (FILE*) &__sf_fake_stderr;
+
+    ets_install_putc1(NULL);
+    ets_install_putc2(NULL);
+  }
+}
 
 void setupWiFi();
 void setupBluetooth();
 
 void setup() {
- Serial.begin(115200);
 
- initProperties();
-  // Connect to Arduino IoT Cloud
-  
-  
+  Serial.begin(115200);
+  delay(5000);
+  setDebug(debug);
 
- //setupWiFi();
-  
-  delay(1000);
+  // put SWD and SWCLK pins connected to SAMD as inputs
+  pinMode(15, INPUT);
+  pinMode(21, INPUT);
 
-  ArduinoCloud.begin(ArduinoIoTPreferredConnection);
-    setDebugMessageLevel(2);
-  ArduinoCloud.printDebugInfo();
-  #ifdef ARDUINO_NINA_ESP32
-    memcpy(CUSTOMCIAO,"INIT" ,sizeof("INIT"));
-  #endif
-  temperature=22.0;
+  pinMode(5, INPUT);
+ /* if (digitalRead(5) == LOW) {
+    setupBluetooth();
+  } else {*/
+    setupWiFi();
+  //}
 }
-
-
 
 // #define UNO_WIFI_REV2
 
@@ -100,108 +137,39 @@ void setupBluetooth() {
 }
 
 void setupWiFi() {
-  esp_bt_controller_mem_release(ESP_BT_MODE_BTDM);
-  //SPIS.begin();
+  //esp_bt_controller_mem_release(ESP_BT_MODE_BTDM);
+  SPIS.begin();
 
-  if (WiFi.status() == WL_NO_SHIELD) {
-    Serial.println("noWIFI");
+ /* if (WiFi.status() == WL_NO_SHIELD) {
     while (1); // no shield
-  }
+  }*/
+
+  commandBuffer = (uint8_t*)heap_caps_malloc(SPI_BUFFER_LEN, MALLOC_CAP_DMA);
+  responseBuffer = (uint8_t*)heap_caps_malloc(SPI_BUFFER_LEN, MALLOC_CAP_DMA);
+
+  CommandHandler.begin();
 }
 
 void loop() {
+  // wait for a command
+  memset(commandBuffer, 0x00, SPI_BUFFER_LEN);
+  int commandLength = SPIS.transfer(NULL, commandBuffer, SPI_BUFFER_LEN);
 
-  ArduinoCloud.update();
-  unsigned long current = millis();
-  if((current-tf)> 10000){
-
-  temperature += 0.5;
-  #ifdef ARDUINO_NINA_ESP32
-    String s = String(temperature);
-    //memcpy(CUSTOMCIAO,s.c_str() ,s.length());
-  #endif
-    if(temperature > 30){
-      temperature = 22.0;
-    }
-    tf = current;
+  if (commandLength == 0) {
+    return;
   }
 
-}
-void onColoredLightChange() {
-  ColoredLight colorlight = coloredLight.getValue();
-
-  float h = colorlight.hue/360;
-  float s = colorlight.sat/100;
-  float b = colorlight.bri/200;
-
-  /*
-  if(colorlight.swi) {
-    leds.setColorHSL(0,h,s,b);
-  }else{
-    leds.setColorHSL(0,h,s,0.0);
+  if (debug) {
+    dumpBuffer("COMMAND", commandBuffer, commandLength);
   }
-  */
 
-  Serial.print("Colored Light Status: ");
-  Serial.println(colorlight.swi);
-  Serial.print("Colored Light Color Hue: ");
-  Serial.print(colorlight.hue);
-  Serial.print(" Sat: ");
-  Serial.print(colorlight.sat);
-  Serial.print(" Bri: ");
-  Serial.print(colorlight.bri);
-  Serial.println();
-}
+  // process
+  memset(responseBuffer, 0x00, SPI_BUFFER_LEN);
+  int responseLength = CommandHandler.handle(commandBuffer, responseBuffer);
 
+  SPIS.transfer(responseBuffer, NULL, responseLength);
 
-void onDimmedLightChange() {
-  DimmedLight dimlight = dimmedLight.getValue();
-
-  /*
-  float b = dimlight.bri/200;
-  if(dimlight.swi){
-    leds.setColorHSL(1,0.1,0.0,b);
-  }else{
-    leds.setColorHSL(1,0.1,0.0,0.0);
+  if (debug) {
+    dumpBuffer("RESPONSE", responseBuffer, responseLength);
   }
-  */
-
-  Serial.print("Dimmed Light Status: ");
-  Serial.println(dimlight.swi);
-  Serial.print("Dimmed Light : ");
-  Serial.print(" Bri: ");
-  Serial.print(dimlight.bri);
-  Serial.println();
 }
-
-
-void onLightChange() {
-  /*
-  if(light){
-    leds.setColorHSL(2,0.1,0.0,1.0);
-  }else{
-    leds.setColorHSL(2,0.1,0.0,0.0);
-  }
-  */
-
-  Serial.print("Light Status: ");
-  Serial.println(light);
-}
-
-void handleButton() {
-  light = !light;
-  /*
-  if(light){
-    leds.setColorHSL(2,0.1,0.0,1.0);
-  }else{
-    leds.setColorHSL(2,0.1,0.0,0.0);
-  }
-  */
-
-  Serial.print("Light: ");
-  Serial.println(light);
-  delayMicroseconds(50000);
-
-}
-
-
