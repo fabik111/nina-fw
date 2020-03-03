@@ -1202,7 +1202,7 @@ int iotAddProperty(const uint8_t command[], uint8_t response[])
   char name[32 + 1];
 
   uint8_t permission;
-  uint8_t seconds;
+  long seconds;
 
   property_type = command[4];
 
@@ -1210,36 +1210,43 @@ int iotAddProperty(const uint8_t command[], uint8_t response[])
   memcpy(name, &command[6], command[5]);
 
   int start_pos = 6 + command[5];
-  permission = command[start_pos];
-  seconds = command[start_pos + 2];
+  permission = command[start_pos + 1];
+    memcpy(&seconds, &command[start_pos + 3], command[start_pos + 2]);
+  //seconds = command[start_pos + 2];
+    Serial.print("property update name: ");
+  Serial.println(name);
+      Serial.print("property update permission: ");
+  Serial.println(permission);
+  Serial.print("property update seconds: ");
+  Serial.println(seconds);
 
   switch (property_type) {
     case 1: {
       CloudBool *property_bool = new CloudBool();
       property_bool->init(String(name), (Permission)permission, NULL);
       _global_property_list.add(property_bool);
-      ArduinoCloud.addPropertyReal(*property_bool, String(name), (permissionType)permission, (long)seconds);
+      ArduinoCloud.addPropertyReal(*property_bool, String(name), (permissionType)permission, seconds);
       }
       break;
     case 2: {
       CloudInt *property_int = new CloudInt();
       property_int->init(String(name), (Permission)permission, NULL);
       _global_property_list.add(property_int);
-      ArduinoCloud.addPropertyReal(*property_int, String(name), (permissionType)permission, (long)seconds);
+      ArduinoCloud.addPropertyReal(*property_int, String(name), (permissionType)permission, seconds);
       }
       break;
     case 3: {
       CloudFloat  * property_float = new CloudFloat();
       property_float->init(String(name), (Permission)permission, NULL);
       _global_property_list.add(property_float);
-      ArduinoCloud.addPropertyReal(*property_float, String(name), (permissionType)permission, (long)seconds);
+      ArduinoCloud.addPropertyReal(*property_float, String(name), (permissionType)permission, seconds);
       }
       break;
     case 4: {
       CloudString * property_string = new CloudString();
       property_string->init(String(name), (Permission)permission, NULL);
       _global_property_list.add(property_string);
-      ArduinoCloud.addPropertyReal(*property_string, String(name), (permissionType)permission, (long)seconds);
+      ArduinoCloud.addPropertyReal(*property_string, String(name), (permissionType)permission, seconds);
       }
       break;
   }
@@ -1277,7 +1284,14 @@ int iotUpdateBool(const uint8_t command[], uint8_t response[])
   CloudBool *prop = (CloudBool *)getPropertyObj(String(propertyName));
 
   if(prop){
-    *prop = propertyValue;
+    bool tmp = (bool) (*prop);
+    if(tmp != propertyValue){
+      Serial.print("bool diverso ho: ");
+      Serial.print(tmp);
+      Serial.print(" mi è arrivato: ");
+      Serial.println(propertyValue);
+      *prop = propertyValue;
+    }
     response[4] = 1;
   }
   else{
@@ -1302,7 +1316,9 @@ int iotUpdateInt(const uint8_t command[], uint8_t response[])
   CloudInt *prop =  (CloudInt *)getPropertyObj(String(propertyName));
 
   if(prop){
-    *prop = propertyValue;
+    int tmp = (int) (*prop);
+    if(tmp != propertyValue)
+      *prop = propertyValue;
     response[4] = 1;
   }
   else{
@@ -1330,7 +1346,14 @@ int iotUpdateFloat(const uint8_t command[], uint8_t response[])
   CloudFloat *prop = (CloudFloat *)getPropertyObj(String(propertyName));
 
   if(prop){
-    *prop = propertyValue;
+    float tmp = (float)(*prop);
+    if(tmp != propertyValue){
+       Serial.print("float diverso ho: ");
+      Serial.print(tmp);
+      Serial.print(" mi è arrivato: ");
+      Serial.println(propertyValue);
+      *prop = propertyValue;
+    }
     response[4] = 1;
   }
   else{
@@ -1356,7 +1379,9 @@ int iotUpdateString(const uint8_t command[], uint8_t response[])
   CloudString *prop =  (CloudString *)getPropertyObj(String(propertyName));
 
   if(prop){
-    *prop = propertyValue;
+    String tmp = (String) *prop;
+    if(tmp != propertyValue)
+      *prop = propertyValue;
     response[4] = 1;
   }
   else{
@@ -1378,7 +1403,7 @@ int iotReadBool(const uint8_t command[], uint8_t response[])
   response[2] = 1; // number of parameters
 
   if(prop){
-    bool val = *prop;
+    bool val = (bool) (*prop);
     response[3] = sizeof(val); // parameter 1 length
     response[4] = val;
     return 5 + sizeof(val);
@@ -1401,7 +1426,7 @@ int iotReadInt(const uint8_t command[], uint8_t response[])
   response[2] = 1; // number of parameters
 
   if(prop){
-    int val = *prop;
+    int val = (int) (*prop);
     response[3] = sizeof(val); // parameter 1 length
     memcpy(&response[4], &val, sizeof(val));
     return 5 + sizeof(val);
@@ -1424,7 +1449,7 @@ int iotReadFloat(const uint8_t command[], uint8_t response[])
   response[2] = 1; // number of parameters
 
   if(prop){
-    float val = *prop;
+    float val = (float) (*prop);
     response[3] = sizeof(val); // parameter 1 length
     memcpy(&response[4], &val, sizeof(val));
     return 5 + sizeof(val);
@@ -1447,7 +1472,7 @@ int iotReadString(const uint8_t command[], uint8_t response[])
   response[2] = 1; // number of parameters
 
   if(prop){
-    String val = *prop;
+    String val = (String) (*prop);
     response[3] = sizeof(val); // parameter 1 length
     memcpy(&response[4], &val, sizeof(val));
     return 5 + sizeof(val);
