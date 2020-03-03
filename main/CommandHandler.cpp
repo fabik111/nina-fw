@@ -1215,8 +1215,9 @@ int iotAddProperty(const uint8_t command[], uint8_t response[])
   //seconds = command[start_pos + 2];
     Serial.print("property update name: ");
   Serial.println(name);
-      Serial.print("property update permission: ");
+  Serial.print("property update permission: ");
   Serial.println(permission);
+  Serial.println(command[start_pos]);
   Serial.print("property update seconds: ");
   Serial.println(seconds);
 
@@ -1372,8 +1373,9 @@ int iotUpdateString(const uint8_t command[], uint8_t response[])
   memcpy(propertyName, &command[4], command[3]);
 
   String propertyValue;
-  memcpy(&propertyValue, &command[5 + command[3]], command[4 + command[3]] );
-
+  char value[command[4 + command[3]]];
+  memcpy(value, &command[5 + command[3]], command[4 + command[3]] );
+  propertyValue = value;
   response[2] = 1; // number of parameters
   response[3] = 1; // parameter 1 length
   CloudString *prop =  (CloudString *)getPropertyObj(String(propertyName));
