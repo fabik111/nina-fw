@@ -1247,6 +1247,10 @@ int iotAddProperty(const uint8_t command[], uint8_t response[])
       CloudString * property_string = new CloudString();
       property_string->init(String(name), (Permission)permission, NULL);
       _global_property_list.add(property_string);
+      Serial.print("name string nella add property");
+      Serial.println(String(name));
+      Serial.print("elementi nella lista: ");
+      Serial.println(_global_property_list.size());
       ArduinoCloud.addPropertyReal(*property_string, String(name), (permissionType)permission, seconds);
       }
       break;
@@ -1344,8 +1348,10 @@ int iotUpdateFloat(const uint8_t command[], uint8_t response[])
 
   response[2] = 1; // number of parameters
   response[3] = 1; // parameter 1 length
+  //String s = String(propertyName);
   CloudFloat *prop = (CloudFloat *)getPropertyObj(String(propertyName));
-
+  /*Serial.print("string name nella update: ");
+  Serial.println(s);*/
   if(prop){
     float tmp = (float)(*prop);
     if(tmp != propertyValue){
@@ -1358,6 +1364,7 @@ int iotUpdateFloat(const uint8_t command[], uint8_t response[])
     response[4] = 1;
   }
   else{
+    //Serial.println("oggetto non trovato");
     response[4] = 0;
   }
 
@@ -1374,16 +1381,31 @@ int iotUpdateString(const uint8_t command[], uint8_t response[])
 
   String propertyValue;
   char value[command[4 + command[3]]];
+  memset(value,0x00,command[4 + command[3]]);
   memcpy(value, &command[5 + command[3]], command[4 + command[3]] );
+  /*Serial.print("lunghezza string: ");
+  Serial.println(command[4 + command[3]]);*/
+   //value[command[4 + command[3]]] = '\0';
+     /* Serial.print("valore grezzo stringa: ");
+      Serial.println(value);*/
+
   propertyValue = value;
+        /*Serial.print("valore  stringa: ");
+      Serial.println(propertyValue);*/
   response[2] = 1; // number of parameters
   response[3] = 1; // parameter 1 length
   CloudString *prop =  (CloudString *)getPropertyObj(String(propertyName));
 
   if(prop){
     String tmp = (String) *prop;
-    if(tmp != propertyValue)
+    if(tmp != propertyValue){
+      Serial.print("string diverso ho: ");
+      Serial.print(tmp);
+      Serial.print(" mi è arrivato: ");
+      Serial.println(value);
+
       *prop = propertyValue;
+    }
     response[4] = 1;
   }
   else{
@@ -1400,7 +1422,9 @@ int iotReadBool(const uint8_t command[], uint8_t response[])
 
   memset(propertyName, 0x00, sizeof(propertyName));
   memcpy(propertyName, &command[4], command[3]);
-
+  /*Serial.print("bool name: ");
+  String s= String(propertyName);
+  Serial.println(s);*/
   CloudBool *prop =  (CloudBool *)getPropertyObj(String(propertyName));
   response[2] = 1; // number of parameters
 
@@ -1446,7 +1470,9 @@ int iotReadFloat(const uint8_t command[], uint8_t response[])
 
   memset(propertyName, 0x00, sizeof(propertyName));
   memcpy(propertyName, &command[4], command[3]);
-
+  /*Serial.print("float name: ");
+  String s= String(propertyName);
+  Serial.println(s);*/
   CloudFloat *prop =  (CloudFloat *)getPropertyObj(String(propertyName));
   response[2] = 1; // number of parameters
 
@@ -1469,15 +1495,25 @@ int iotReadString(const uint8_t command[], uint8_t response[])
 
   memset(propertyName, 0x00, sizeof(propertyName));
   memcpy(propertyName, &command[4], command[3]);
-
+  /*Serial.print("string name: ");
+  String s= String(propertyName);
+  Serial.println(s);*/
   CloudString *prop =  (CloudString *)getPropertyObj(String(propertyName));
   response[2] = 1; // number of parameters
 
-  if(prop){
+
+  if(prop!=NULL){
+
     String val = (String) (*prop);
-    response[3] = sizeof(val); // parameter 1 length
-    memcpy(&response[4], &val, sizeof(val));
-    return 5 + sizeof(val);
+      Serial.print("string invio al samd : ");
+      Serial.println(val);
+      /*Serial.print("string grezzo invio al samd : ");
+      Serial.println((String)(*prop));*/
+    response[3] = (val.length() + 1); // parameter 1 length
+    memcpy(&response[4], val.c_str(), (val.length() + 1));
+    return 5 + (val.length() + 1);
+  }else{
+    //Serial.println("errore oggetto non trovato");
   }
 
   response[3] = 1;
