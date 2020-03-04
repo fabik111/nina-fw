@@ -39,6 +39,11 @@ extern char CUSTOMCIAO[5];
 
 LinkedList<ArduinoCloudProperty *> _global_property_list;
 WiFiConnectionHandler *ArduinoIoTPreferredConnection;
+char ssid[32 + 1];
+char pass[64 + 1];
+char mqtt[64 + 1];
+char thingId[36];
+
 
 #define MAX_SOCKETS CONFIG_LWIP_MAX_SOCKETS
 uint8_t socketTypes[MAX_SOCKETS];
@@ -1146,9 +1151,7 @@ int setAnalogWrite(const uint8_t command[], uint8_t response[])
 */
 int iotBegin(const uint8_t command[], uint8_t response[])
 {
-  char ssid[32 + 1];
-  char pass[64 + 1];
-  char mqtt[64 + 1];
+
 
   memset(ssid, 0x00, sizeof(ssid));
   memset(pass, 0x00, sizeof(pass));
@@ -1156,8 +1159,15 @@ int iotBegin(const uint8_t command[], uint8_t response[])
 
   memcpy(ssid, &command[4], command[3]);
   memcpy(pass, &command[5 + command[3]], command[4 + command[3]]);
-  memcpy(pass, &command[6 + command[5 + command[3] + command[4 + command[3]]]], command[5 + command[3] + command[4 + command[3]]]);
-
+  uint8_t dim_first_param = command[3];
+  uint8_t dim_second_param = command[4 + command[3]];
+  memcpy(mqtt, &command[6 + dim_first_param + dim_second_param], command[5 + dim_first_param + dim_second_param]);
+  Serial.print("ssid arrived: ");
+  Serial.println(ssid);
+  Serial.print("pass arrived: ");
+  Serial.println(pass);
+  Serial.print("mqtt arrived: ");
+  Serial.println(mqtt);
   ArduinoIoTPreferredConnection = new WiFiConnectionHandler(ssid, pass);
   ArduinoCloud.begin(*ArduinoIoTPreferredConnection , mqtt);
 
@@ -1192,7 +1202,7 @@ int iotAddProperty(const uint8_t command[], uint8_t response[])
   char name[32 + 1];
 
   uint8_t permission;
-  uint8_t seconds;
+  long seconds;
 
   property_type = command[4];
 
@@ -1200,36 +1210,44 @@ int iotAddProperty(const uint8_t command[], uint8_t response[])
   memcpy(name, &command[6], command[5]);
 
   int start_pos = 6 + command[5];
-  permission = command[start_pos];
-  seconds = command[start_pos + 2];
+  permission = command[start_pos + 1];
+  memcpy(&seconds, &command[start_pos + 3], command[start_pos + 2]);
+  //seconds = command[start_pos + 2];
+    Serial.print("property update name: ");
+  Serial.println(name);
+      Serial.print("property update permission: ");
+  Serial.println(permission);
+  Serial.println(command[start_pos]);
+  Serial.print("property update seconds: ");
+  Serial.println(seconds);
 
   switch (property_type) {
     case 1: {
       CloudBool *property_bool = new CloudBool();
       property_bool->init(String(name), (Permission)permission, NULL);
       _global_property_list.add(property_bool);
-      ArduinoCloud.addPropertyReal(*property_bool, String(name), (permissionType)permission, (long)seconds);
+      ArduinoCloud.addPropertyReal(*property_bool, String(name), (permissionType)permission, seconds);
       }
       break;
     case 2: {
       CloudInt *property_int = new CloudInt();
       property_int->init(String(name), (Permission)permission, NULL);
       _global_property_list.add(property_int);
-      ArduinoCloud.addPropertyReal(*property_int, String(name), (permissionType)permission, (long)seconds);
+      ArduinoCloud.addPropertyReal(*property_int, String(name), (permissionType)permission, seconds);
       }
       break;
     case 3: {
       CloudFloat  * property_float = new CloudFloat();
       property_float->init(String(name), (Permission)permission, NULL);
       _global_property_list.add(property_float);
-      ArduinoCloud.addPropertyReal(*property_float, String(name), (permissionType)permission, (long)seconds);
+      ArduinoCloud.addPropertyReal(*property_float, String(name), (permissionType)permission, seconds);
       }
       break;
     case 4: {
       CloudString * property_string = new CloudString();
       property_string->init(String(name), (Permission)permission, NULL);
       _global_property_list.add(property_string);
-      ArduinoCloud.addPropertyReal(*property_string, String(name), (permissionType)permission, (long)seconds);
+      ArduinoCloud.addPropertyReal(*property_string, String(name), (permissionType)permission, seconds);
       }
       break;
   }
@@ -1267,7 +1285,14 @@ int iotUpdateBool(const uint8_t command[], uint8_t response[])
   CloudBool *prop = (CloudBool *)getPropertyObj(String(propertyName));
 
   if(prop){
-    *prop = propertyValue;
+    bool tmp = (bool) (*prop);
+    if(tmp != propertyValue){
+      Serial.print("bool diverso ho: ");
+      Serial.print(tmp);
+      Serial.print(" mi è arrivato: ");
+      Serial.println(propertyValue);
+      *prop = propertyValue;
+    }
     response[4] = 1;
   }
   else{
@@ -1292,7 +1317,9 @@ int iotUpdateInt(const uint8_t command[], uint8_t response[])
   CloudInt *prop =  (CloudInt *)getPropertyObj(String(propertyName));
 
   if(prop){
-    *prop = propertyValue;
+    int tmp = (int) (*prop);
+    if(tmp != propertyValue)
+      *prop = propertyValue;
     response[4] = 1;
   }
   else{
@@ -1317,13 +1344,22 @@ int iotUpdateFloat(const uint8_t command[], uint8_t response[])
 
   response[2] = 1; // number of parameters
   response[3] = 1; // parameter 1 length
+
   CloudFloat *prop = (CloudFloat *)getPropertyObj(String(propertyName));
 
   if(prop){
-    *prop = propertyValue;
+     float tmp = (float)(*prop);
+    if(tmp != propertyValue){
+       Serial.print("float diverso ho: ");
+      Serial.print(tmp);
+      Serial.print(" mi è arrivato: ");
+      Serial.println(propertyValue);
+      *prop = propertyValue;
+    }
     response[4] = 1;
   }
   else{
+	//Serial.println("oggetto non trovato");
     response[4] = 0;
   }
 
@@ -1339,14 +1375,29 @@ int iotUpdateString(const uint8_t command[], uint8_t response[])
   memcpy(propertyName, &command[4], command[3]);
 
   String propertyValue;
-  memcpy(&propertyValue, &command[5 + command[3]], command[4 + command[3]] );
+  char value[command[4 + command[3]]];
+	memset(value,0x00,command[4 + command[3]]);
+  memcpy(value, &command[5 + command[3]], command[4 + command[3]] );
+
+  propertyValue = value;
 
   response[2] = 1; // number of parameters
   response[3] = 1; // parameter 1 length
   CloudString *prop =  (CloudString *)getPropertyObj(String(propertyName));
 
   if(prop){
-    *prop = propertyValue;
+    String tmp = (String) *prop;
+    if(tmp != propertyValue)
+		Serial.print("string diverso ho: ");
+      Serial.print(tmp);
+      Serial.print(" mi è arrivato: ");
+      Serial.println(value);
+
+
+
+
+      *prop = propertyValue;
+
     response[4] = 1;
   }
   else{
@@ -1368,10 +1419,13 @@ int iotReadBool(const uint8_t command[], uint8_t response[])
   response[2] = 1; // number of parameters
 
   if(prop){
-    bool val = *prop;
+    bool val = (bool) (*prop);
     response[3] = sizeof(val); // parameter 1 length
     response[4] = val;
-    return 5 + sizeof(val);
+    /*unsigned long lastChangeTimestamp = prop->getLastCloudChangeTimestamp();
+    response[5] = sizeof(lastChangeTimestamp);
+    memcpy(&response[6], &lastChangeTimestamp, sizeof(lastChangeTimestamp));*/
+    return 5 + sizeof(val) /*+ 1 + sizeof(lastChangeTimestamp)*/;
   }
 
   response[3] = 1;
@@ -1391,9 +1445,13 @@ int iotReadInt(const uint8_t command[], uint8_t response[])
   response[2] = 1; // number of parameters
 
   if(prop){
-    int val = *prop;
+    int val = (int) (*prop);
     response[3] = sizeof(val); // parameter 1 length
     memcpy(&response[4], &val, sizeof(val));
+    /*unsigned long lastChangeTimestamp = prop->getLastCloudChangeTimestamp();
+    response[5 + sizeof(val)] = sizeof(lastChangeTimestamp);
+    memcpy(&response[6], &lastChangeTimestamp, sizeof(lastChangeTimestamp));
+    return 5 + sizeof(val) + 1 + sizeof(lastChangeTimestamp);*/
     return 5 + sizeof(val);
   }
 
@@ -1414,7 +1472,7 @@ int iotReadFloat(const uint8_t command[], uint8_t response[])
   response[2] = 1; // number of parameters
 
   if(prop){
-    float val = *prop;
+    float val = (float) (*prop);
     response[3] = sizeof(val); // parameter 1 length
     memcpy(&response[4], &val, sizeof(val));
     return 5 + sizeof(val);
@@ -1437,10 +1495,15 @@ int iotReadString(const uint8_t command[], uint8_t response[])
   response[2] = 1; // number of parameters
 
   if(prop){
-    String val = *prop;
-    response[3] = sizeof(val); // parameter 1 length
-    memcpy(&response[4], &val, sizeof(val));
-    return 5 + sizeof(val);
+
+    String val = (String) (*prop);
+    response[3] = (val.length() + 1); // parameter 1 length
+    memcpy(&response[4], val.c_str(), (val.length() + 1));
+    return 5 + (val.length() + 1);
+
+
+  }else{
+    //Serial.println("errore oggetto non trovato");
   }
 
   response[3] = 1;
@@ -1451,10 +1514,11 @@ int iotReadString(const uint8_t command[], uint8_t response[])
 //0x6B
 int iotSetThingID(const uint8_t command[], uint8_t response[])
 {
-  char thingId[36];
+
   memset(thingId, 0x00, sizeof(thingId));
   memcpy(thingId, &command[4], command[3]);
-
+  Serial.print("thing id: ");
+  Serial.println(thingId);
   ArduinoCloud.setThingId(thingId);
 
   response[2] = 1; // number of parameters
@@ -1468,9 +1532,10 @@ int iotSetBoardId(const uint8_t command[], uint8_t response[])
 {
   char boardId[command[3]];
 
- memset(boardId, 0x00, sizeof(boardId));
- memcpy(boardId, &command[4], command[3]);
-
+  memset(boardId, 0x00, sizeof(boardId));
+  memcpy(boardId, &command[4], command[3]);
+  Serial.print("board id: ");
+  Serial.println(boardId);
   ArduinoCloud.setBoardId(boardId);
 
   response[2] = 1; // number of parameters
@@ -1484,9 +1549,10 @@ int iotSetSecretDeviceKey(const uint8_t command[], uint8_t response[])
 {
   char boardSecret[command[3]];
 
- memset(boardSecret, 0x00, sizeof(boardSecret));
- memcpy(boardSecret, &command[4], command[3]);
-
+  memset(boardSecret, 0x00, sizeof(boardSecret));
+  memcpy(boardSecret, &command[4], command[3]);
+  Serial.print("secret id: ");
+  Serial.println(boardSecret);
   ArduinoCloud.setSecretDeviceKey(boardSecret);
 
   response[2] = 1; // number of parameters
@@ -1570,6 +1636,20 @@ int CommandHandlerClass::handle(const uint8_t command[], uint8_t response[])
   }
 
   xSemaphoreGive(_updateGpio0PinSemaphore);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
   return responseLength;
 }
