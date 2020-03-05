@@ -86,8 +86,8 @@ void setupBluetooth();
 
 void setup() {
 
-  Serial.begin(115200);
-  delay(5000);
+  //Serial.begin(115200);
+  //delay(5000);
   setDebug(debug);
 
   // put SWD and SWCLK pins connected to SAMD as inputs
@@ -95,11 +95,11 @@ void setup() {
   pinMode(21, INPUT);
 
   pinMode(5, INPUT);
- /* if (digitalRead(5) == LOW) {
+ if (digitalRead(5) == LOW) {
     setupBluetooth();
-  } else {*/
+  } else {
     setupWiFi();
-  //}
+  }
 }
 
 // #define UNO_WIFI_REV2
@@ -140,9 +140,7 @@ void setupWiFi() {
   //esp_bt_controller_mem_release(ESP_BT_MODE_BTDM);
   SPIS.begin();
 
- /* if (WiFi.status() == WL_NO_SHIELD) {
-    while (1); // no shield
-  }*/
+  //while(WiFi.status() == WL_NO_SHIELD);
 
   commandBuffer = (uint8_t*)heap_caps_malloc(SPI_BUFFER_LEN, MALLOC_CAP_DMA);
   responseBuffer = (uint8_t*)heap_caps_malloc(SPI_BUFFER_LEN, MALLOC_CAP_DMA);
