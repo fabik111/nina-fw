@@ -19,11 +19,11 @@
 
 #ifndef client_h
 #define client_h
-//#include "Print.h"
-//#include "Stream.h"
+#include "Print.h"
+#include "Stream.h"
 #include "IPAddress.h"
 
-class Client/*: public Stream*/
+class Client: public Stream
 {
 public:
     virtual int connect(IPAddress ip, uint16_t port) =0;
