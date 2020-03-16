@@ -2,7 +2,7 @@
  * Copyright (c) 2016 Thomas Pornin <pornin@bolet.org>
  * Copyright (c) 2018 Arduino SA. All rights reserved.
  *
- * Permission is hereby granted, free of charge, to any person obtaining
+ * Permission is hereby granted, free of charge, to any person obtaining 
  * a copy of this software and associated documentation files (the
  * "Software"), to deal in the Software without restriction, including
  * without limitation the rights to use, copy, modify, merge, publish,
@@ -10,12 +10,12 @@
  * permit persons to whom the Software is furnished to do so, subject to
  * the following conditions:
  *
- * The above copyright notice and this permission notice shall be
+ * The above copyright notice and this permission notice shall be 
  * included in all copies or substantial portions of the Software.
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, 
  * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND 
  * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
  * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
  * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
@@ -37,14 +37,12 @@ eccX08_sign_asn1(const br_ec_impl * /*impl*/,
 {
   unsigned char rsig[(ORDER_LEN << 1) + 12];
   size_t sig_len;
-Serial.println("sono nell'ecSign");
+
   if (sk->curve != BR_EC_secp256r1) {
-    Serial.println("errore nell'ecSign sk->curve");
     return 0;
   }
 
   if (!ECCX08.ecSign((int)(sk->x), (const uint8_t*)hash_value, (uint8_t*)rsig)) {
-    Serial.println("errore nell'ecSign");
     return 0;
   }
   sig_len = 64;

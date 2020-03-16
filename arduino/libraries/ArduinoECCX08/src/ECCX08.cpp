@@ -44,7 +44,7 @@ int ECCX08Class::begin()
 
   wakeup();
   idle();
-
+  
   long ver = version() & 0x0F00000;
 
   if (ver != 0x0500000 && ver != 0x0600000) {
@@ -135,13 +135,11 @@ long ECCX08Class::random(long min, long max)
 int ECCX08Class::random(byte data[], size_t length)
 {
   if (!wakeup()) {
-    Serial.println("not wakeup ecc random");
     return 0;
   }
 
   while (length) {
     if (!sendCommand(0x1b, 0x00, 0x0000)) {
-        Serial.println("not command ecc random");
       return 0;
     }
 
@@ -150,7 +148,6 @@ int ECCX08Class::random(byte data[], size_t length)
     byte response[32];
 
     if (!receiveResponse(response, sizeof(response))) {
-      Serial.println("not res ecc random");
       return 0;
     }
 
@@ -513,20 +510,17 @@ int ECCX08Class::challenge(const byte message[])
   uint8_t status;
 
   if (!wakeup()) {
-    Serial.println("not wakeup ecc challenge");
     return 0;
   }
 
   // Nounce, pass through
   if (!sendCommand(0x16, 0x03, 0x0000, message, 32)) {
-    Serial.println("not command ecc challenge");
     return 0;
   }
 
   delay(29);
 
   if (!receiveResponse(&status, sizeof(status))) {
-    Serial.println("not command ecc resp");
     return 0;
   }
 
@@ -534,7 +528,6 @@ int ECCX08Class::challenge(const byte message[])
   idle();
 
   if (status != 0) {
-    Serial.println("not command ecc random");
     return 0;
   }
 
@@ -693,7 +686,7 @@ int ECCX08Class::lock(int zone)
 int ECCX08Class::addressForSlotOffset(int slot, int offset)
 {
   int block = offset / 32;
-  offset = (offset % 32) / 4;
+  offset = (offset % 32) / 4;  
 
   return (slot << 3) | (block << 8) | (offset);
 }
@@ -701,8 +694,8 @@ int ECCX08Class::addressForSlotOffset(int slot, int offset)
 int ECCX08Class::sendCommand(uint8_t opcode, uint8_t param1, uint16_t param2, const byte data[], size_t dataLength)
 {
   int commandLength = 8 + dataLength; // 1 for type, 1 for length, 1 for opcode, 1 for param1, 2 for param2, 2 for crc
-  byte command[commandLength];
-
+  byte command[commandLength]; 
+  
   command[0] = 0x03;
   command[1] = sizeof(command) - 1;
   command[2] = opcode;
@@ -746,7 +739,7 @@ int ECCX08Class::receiveResponse(void* response, size_t length)
   if (responseCrc != crc16(responseBuffer, responseSize - 2)) {
     return 0;
   }
-
+  
   memcpy(response, &responseBuffer[1], length);
 
   return 1;
@@ -768,7 +761,7 @@ uint16_t ECCX08Class::crc16(const byte data[], size_t length)
       uint8_t crcBit = crc >> 15;
 
       crc <<= 1;
-
+      
       if (dataBit != crcBit) {
         crc ^= 0x8005;
       }

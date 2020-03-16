@@ -17,19 +17,9 @@
 
 #include "ArduinoCloudProperty.h"
 
-#ifdef ARDUINO_ARCH_SAMD
-  #include <RTCZero.h>
-  extern RTCZero rtc;
+#ifndef ARDUINO_ARCH_SAMD
+  #pragma message "No RTC available on this architecture - ArduinoIoTCloud will not keep track of local change timestamps ."
 #endif
-
-static unsigned long getTimestamp() {
-  #ifdef ARDUINO_ARCH_SAMD
-  return rtc.getEpoch();
-  #else
-#pragma message "No RTC available on this architecture - ArduinoIoTCloud will not keep track of local change timestamps ."
-  return 0;
-  #endif
-}
 
 /******************************************************************************
    CTOR/DTOR
@@ -88,24 +78,17 @@ ArduinoCloudProperty & ArduinoCloudProperty::publishEvery(unsigned long const se
 
 bool ArduinoCloudProperty::shouldBeUpdated() {
   if (!_has_been_updated_once) {
-    //Serial.println("!_has_been_updated_once");
     return true;
   }
 
   if (_has_been_modified_in_callback) {
     _has_been_modified_in_callback = false;
-    //Serial.println("_has_been_modified_in_callback");
     return true;
   }
 
   if (_update_policy == UpdatePolicy::OnChange) {
-    long mil= millis();
-
-    return (isDifferentFromCloud() && ((mil - _last_updated_millis) >= (_min_time_between_updates_millis)));
+    return (isDifferentFromCloud() && ((millis() - _last_updated_millis) >= (_min_time_between_updates_millis)));
   } else if (_update_policy == UpdatePolicy::TimeInterval) {
-    /*long mil= millis();
-     Serial.print("timeinterval millis(): ");
-    Serial.print(mil);*/
     return ((millis() - _last_updated_millis) >= _update_interval_millis);
   } else {
     return false;
@@ -270,8 +253,6 @@ void ArduinoCloudProperty::updateLocalTimestamp() {
   if (isReadableByCloud()) {
     if (_get_time_func) {
       _last_local_change_timestamp = _get_time_func();
-    } else {
-      _last_local_change_timestamp = getTimestamp();
     }
   }
 }

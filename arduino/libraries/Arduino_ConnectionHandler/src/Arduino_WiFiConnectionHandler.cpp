@@ -118,6 +118,7 @@ NetworkConnectionState WiFiConnectionHandler::update_handleConnecting() {
 #ifndef BOARD_ESP8266
   if (WiFi.status() != WL_CONNECTED) {
     WiFi.begin(ssid, pass);
+    delay(10000);
   }
 #endif /* ifndef BOARD_ESP8266 */
 

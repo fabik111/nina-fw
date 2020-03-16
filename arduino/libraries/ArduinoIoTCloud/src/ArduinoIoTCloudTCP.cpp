@@ -109,20 +109,17 @@ int ArduinoIoTCloudTCP::begin(Client& net, String brokerAddress, uint16_t broker
   byte deviceIdBytes[72];
   if (!ECCX08.begin()) {
     Debug.print(DBG_ERROR, "Cryptography processor failure. Make sure you have a compatible board.");
-    while(1);
     return 0;
   }
 
   if (!ECCX08.readSlot(deviceIdSlot, deviceIdBytes, sizeof(deviceIdBytes))) {
     Debug.print(DBG_ERROR, "Cryptography processor read failure.");
-    while(1);
     return 0;
   }
   _device_id = (char*)deviceIdBytes;
 
   if (!ECCX08Cert.beginReconstruction(keySlot, compressedCertSlot, serialNumberAndAuthorityKeyIdentifierSlot)) {
     Debug.print(DBG_ERROR, "Cryptography certificate reconstruction failure.");
-    while(1);
     return 0;
   }
 
@@ -134,7 +131,6 @@ int ArduinoIoTCloudTCP::begin(Client& net, String brokerAddress, uint16_t broker
 
   if (!ECCX08Cert.endReconstruction()) {
     Debug.print(DBG_ERROR, "Cryptography certificate reconstruction failure.");
-    while(1);
     return 0;
   }
 

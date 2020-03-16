@@ -2,7 +2,7 @@
  * Copyright (c) 2016 Thomas Pornin <pornin@bolet.org>
  * Copyright (c) 2018 Arduino SA. All rights reserved.
  *
- * Permission is hereby granted, free of charge, to any person obtaining
+ * Permission is hereby granted, free of charge, to any person obtaining 
  * a copy of this software and associated documentation files (the
  * "Software"), to deal in the Software without restriction, including
  * without limitation the rights to use, copy, modify, merge, publish,
@@ -10,12 +10,12 @@
  * permit persons to whom the Software is furnished to do so, subject to
  * the following conditions:
  *
- * The above copyright notice and this permission notice shall be
+ * The above copyright notice and this permission notice shall be 
  * included in all copies or substantial portions of the Software.
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, 
  * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND 
  * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
  * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
  * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
@@ -41,9 +41,8 @@ eccX08_vrfy_asn1(const br_ec_impl * /*impl*/,
    * may trigger a size expansion when converting to "raw" format.
    */
   unsigned char rsig[(FIELD_LEN << 2) + 24];
-Serial.println("sono ecdsaVerify");
+
   if (sig_len > ((sizeof rsig) >> 1)) {
-    Serial.println("errore nell'ecdsaVerify sig_len");
     return 0;
   }
 
@@ -51,15 +50,12 @@ Serial.println("sono ecdsaVerify");
   sig_len = br_ecdsa_asn1_to_raw(rsig, sig_len);
 
   if (hash_len != 32 || pk->curve != BR_EC_secp256r1 || pk->qlen != 65 || sig_len != 64) {
-    Serial.println("errore nell'ecdsaVerify hash_len");
     return 0;
   }
 
   // TODO: understand why the public key is &pk->q[1] instead of &pk->q[0] ...
   if (!ECCX08.ecdsaVerify((const uint8_t*)hash, (const uint8_t*)rsig, (const uint8_t*)&pk->q[1])) {
-    Serial.println("errore nell'ecdsaVerify");
-    //return 0;
-    return 1;
+    return 0;
   }
 
   return 1;

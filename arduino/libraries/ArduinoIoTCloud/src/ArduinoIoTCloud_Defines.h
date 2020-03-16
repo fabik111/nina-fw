@@ -37,7 +37,6 @@
 #if defined(ARDUINO_NINA_ESP32)
   #define HAS_TCP
   #define BOARD_HAS_ECCX08
-  //#define BOARD_ESP use only for test with mkr1000 and esp32
 #endif
 
 #endif /* ARDUINO_IOT_CLOUD_DEFINES_H_ */
