@@ -1413,16 +1413,16 @@ int iotReadBool(const uint8_t command[], uint8_t response[])
   memcpy(propertyName, &command[4], command[3]);
 
   CloudBool *prop =  (CloudBool *)getPropertyObj(String(propertyName));
-  response[2] = 1; // number of parameters
-  //response[2] = 2;
+  //response[2] = 1; // number of parameters
+  response[2] = 2;
   if(prop){
     bool val = (bool) (*prop);
     response[3] = sizeof(val); // parameter 1 length
     response[4] = val;
-    /*unsigned long lastChangeTimestamp = prop->getLastCloudChangeTimestamp();
+    unsigned long lastChangeTimestamp = prop->getLastCloudChangeTimestamp();
     response[5] = sizeof(lastChangeTimestamp);
-    memcpy(&response[6], &lastChangeTimestamp, sizeof(lastChangeTimestamp));*/
-    return 5 + sizeof(val) /*+ 1 + sizeof(lastChangeTimestamp)*/;
+    memcpy(&response[6], &lastChangeTimestamp, sizeof(lastChangeTimestamp));
+    return 5 + sizeof(val) + 1 + sizeof(lastChangeTimestamp);
   }
 
   response[3] = 1;
@@ -1439,17 +1439,17 @@ int iotReadInt(const uint8_t command[], uint8_t response[])
   memcpy(propertyName, &command[4], command[3]);
 
   CloudInt *prop =  (CloudInt *)getPropertyObj(String(propertyName));
-  response[2] = 1; // number of parameters
-  //response[2] = 2;
+  //response[2] = 1; // number of parameters
+  response[2] = 2;
   if(prop){
     int val = (int) (*prop);
     response[3] = sizeof(val); // parameter 1 length
     memcpy(&response[4], &val, sizeof(val));
-    /*unsigned long lastChangeTimestamp = prop->getLastCloudChangeTimestamp();
+    unsigned long lastChangeTimestamp = prop->getLastCloudChangeTimestamp();
     response[5 + sizeof(val)] = sizeof(lastChangeTimestamp);
     memcpy(&response[6 + sizeof(val)], &lastChangeTimestamp, sizeof(lastChangeTimestamp));
-    return 5 + sizeof(val) + 1 + sizeof(lastChangeTimestamp);*/
-    return 5 + sizeof(val);
+    return 5 + sizeof(val) + 1 + sizeof(lastChangeTimestamp);
+    //return 5 + sizeof(val);
   }
 
   response[3] = 1;
@@ -1466,17 +1466,17 @@ int iotReadFloat(const uint8_t command[], uint8_t response[])
   memcpy(propertyName, &command[4], command[3]);
 
   CloudFloat *prop =  (CloudFloat *)getPropertyObj(String(propertyName));
-  response[2] = 1; // number of parameters
-  //response[2] = 2;
+  //response[2] = 1; // number of parameters
+  response[2] = 2;
   if(prop){
     float val = (float) (*prop);
     response[3] = sizeof(val); // parameter 1 length
     memcpy(&response[4], &val, sizeof(val));
-    /*unsigned long lastChangeTimestamp = prop->getLastCloudChangeTimestamp();
+    unsigned long lastChangeTimestamp = prop->getLastCloudChangeTimestamp();
     response[5 + sizeof(val)] = sizeof(lastChangeTimestamp);
     memcpy(&response[6 + sizeof(val)], &lastChangeTimestamp, sizeof(lastChangeTimestamp));
-    return 5 + sizeof(val) + 1 + sizeof(lastChangeTimestamp);*/
-    return 5 + sizeof(val);
+    return 5 + sizeof(val) + 1 + sizeof(lastChangeTimestamp);
+    //return 5 + sizeof(val);
   }
 
   response[3] = 1;
@@ -1493,18 +1493,18 @@ int iotReadString(const uint8_t command[], uint8_t response[])
   memcpy(propertyName, &command[4], command[3]);
 
   CloudString *prop =  (CloudString *)getPropertyObj(String(propertyName));
-  response[2] = 1; // number of parameters
-  //response[2] = 2;
+  //response[2] = 1; // number of parameters
+  response[2] = 2;
   if(prop){
 
     String val = (String) (*prop);
     response[3] = (val.length() + 1); // parameter 1 length
     memcpy(&response[4], val.c_str(), (val.length() + 1));
-    /*unsigned long lastChangeTimestamp = prop->getLastCloudChangeTimestamp();
+    unsigned long lastChangeTimestamp = prop->getLastCloudChangeTimestamp();
     response[5 + val.length() + 1] = sizeof(lastChangeTimestamp);
-    memcpy(&response[6 + val.length() + 1)], &lastChangeTimestamp, sizeof(lastChangeTimestamp));
-    return 5 + val.length() + 1 + 1 + sizeof(lastChangeTimestamp);*/
-    return 5 + (val.length() + 1);
+    memcpy(&response[6 + val.length() + 1], &lastChangeTimestamp, sizeof(lastChangeTimestamp));
+    return 5 + val.length() + 1 + 1 + sizeof(lastChangeTimestamp);
+    //return 5 + (val.length() + 1);
 
 
   }else{
