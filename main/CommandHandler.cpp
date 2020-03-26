@@ -43,6 +43,7 @@ char ssid[32 + 1];
 char pass[64 + 1];
 char mqtt[64 + 1];
 char thingId[36];
+bool isint16=false;
 
 
 #define MAX_SOCKETS CONFIG_LWIP_MAX_SOCKETS
@@ -1170,8 +1171,8 @@ int iotBegin(const uint8_t command[], uint8_t response[])
   Serial.println(mqtt);*/
   ArduinoIoTPreferredConnection = new WiFiConnectionHandler(ssid, pass);
   ArduinoCloud.begin(*ArduinoIoTPreferredConnection , mqtt);
-    setDebugMessageLevel(2);
-  ArduinoCloud.printDebugInfo();
+  //setDebugMessageLevel(2);
+  //ArduinoCloud.printDebugInfo();
   response[2] = 1; // number of parameters
   response[3] = 1; // parameter 1 length
   response[4] = 1;
@@ -1214,14 +1215,15 @@ int iotAddProperty(const uint8_t command[], uint8_t response[])
   permission = command[start_pos + 1];
   memcpy(&seconds, &command[start_pos + 3], command[start_pos + 2]);
   //seconds = command[start_pos + 2];
-  /*  Serial.print("property update name: ");
-  Serial.println(name);
-  Serial.print("property update permission: ");
-  Serial.println(permission);
-  Serial.println(command[start_pos]);
-  Serial.print("property update seconds: ");
-  Serial.println(seconds);*/
-
+  /*if(String(name)=="intero"){
+    Serial.print("name: ");
+    Serial.println(name);
+    Serial.print("permission: ");
+    Serial.println(permission);
+    Serial.println(command[start_pos]);
+    Serial.print("seconds: ");
+    Serial.println(seconds);
+  }*/
   switch (property_type) {
     case 1: {
       CloudBool *property_bool = new CloudBool();
@@ -1288,7 +1290,7 @@ int iotUpdateBool(const uint8_t command[], uint8_t response[])
   if(prop){
     bool tmp = (bool) (*prop);
     if(tmp != propertyValue){
-      /*Serial.print("bool diverso ho: ");
+    /*Serial.print("bool diverso ho: ");
       Serial.print(tmp);
       Serial.print(" mi è arrivato: ");
       Serial.println(propertyValue);*/
@@ -1309,10 +1311,21 @@ int iotUpdateInt(const uint8_t command[], uint8_t response[])
 
   memset(propertyName, 0x00, sizeof(propertyName));
   memcpy(propertyName, &command[4], command[3]);
+  int propertyValue = 0;
+  /*Fix for ARDUINO UNO WIFI REV 2 and other AVR board where int is defined as int16_t*/
+  if(command[4 + command[3]] == 2){
+    int16_t shortpropvalue;
+    memcpy(&shortpropvalue, &command[5 + command[3]], command[4 + command[3]] );
+    propertyValue = shortpropvalue;
+    if(!isint16){
+      isint16=true;
+    }
 
-  int propertyValue;
-  memcpy(&propertyValue, &command[5 + command[3]], command[4 + command[3]] );
-
+  }
+  else{
+    memcpy(&propertyValue, &command[5 + command[3]], command[4 + command[3]] );
+  }
+  /*End Fix*/
   response[2] = 1; // number of parameters
   response[3] = 1; // parameter 1 length
   CloudInt *prop =  (CloudInt *)getPropertyObj(String(propertyName));
@@ -1443,12 +1456,28 @@ int iotReadInt(const uint8_t command[], uint8_t response[])
   response[2] = 2;
   if(prop){
     int val = (int) (*prop);
-    response[3] = sizeof(val); // parameter 1 length
-    memcpy(&response[4], &val, sizeof(val));
-    unsigned long lastChangeTimestamp = prop->getLastCloudChangeTimestamp();
-    response[5 + sizeof(val)] = sizeof(lastChangeTimestamp);
-    memcpy(&response[6 + sizeof(val)], &lastChangeTimestamp, sizeof(lastChangeTimestamp));
-    return 5 + sizeof(val) + 1 + sizeof(lastChangeTimestamp);
+
+    /*FIX for ARDUINO UNO WIFI REV 2 and other AVR board where int is defined as int16_t*/
+    if(isint16){
+      response[3] = 2; // parameter 1 length
+
+      memcpy(&response[4], &val, 2);
+      unsigned long lastChangeTimestamp = prop->getLastCloudChangeTimestamp();
+      response[5 + 2] = sizeof(lastChangeTimestamp);
+      memcpy(&response[6 + 2], &lastChangeTimestamp, sizeof(lastChangeTimestamp));
+      return 5 + 2 + 1 + sizeof(lastChangeTimestamp);
+    }
+    else{
+      response[3] = sizeof(val); // parameter 1 length
+
+      memcpy(&response[4], &val, sizeof(val));
+      unsigned long lastChangeTimestamp = prop->getLastCloudChangeTimestamp();
+      response[5 + sizeof(val)] = sizeof(lastChangeTimestamp);
+      memcpy(&response[6 + sizeof(val)], &lastChangeTimestamp, sizeof(lastChangeTimestamp));
+
+      return 5 + sizeof(val) + 1 + sizeof(lastChangeTimestamp);
+    }
+    /*END FIX*/
     //return 5 + sizeof(val);
   }
 
