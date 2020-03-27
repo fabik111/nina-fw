@@ -20,8 +20,10 @@
 #include <lwip/sockets.h>
 
 #include <WiFi.h>
-#include <WiFiClient.h>
-#include <WiFiServer.h>
+//#include <WiFiClient.h>
+#include <WiFiSimple.h>
+//#include <WiFiServer.h>
+#include <WiFiServerSimple.h>
 #include <WiFiSSLClient.h>
 #include <WiFiUdp.h>
 
@@ -45,13 +47,13 @@ char mqtt[64 + 1];
 char thingId[36];
 bool isint16=false;
 
-
 #define MAX_SOCKETS CONFIG_LWIP_MAX_SOCKETS
 uint8_t socketTypes[MAX_SOCKETS];
-WiFiClient tcpClients[MAX_SOCKETS];
+//WiFiClient tcpClients[MAX_SOCKETS];
+WiFiSimple tcpClients[MAX_SOCKETS];
 WiFiUDP udps[MAX_SOCKETS];
 WiFiSSLClient tlsClients[MAX_SOCKETS];
-WiFiServer tcpServers[MAX_SOCKETS];
+WiFiServerSimple tcpServers[MAX_SOCKETS];
 
 
 int setNet(const uint8_t command[], uint8_t response[])
@@ -405,7 +407,7 @@ int startServerTcp(const uint8_t command[], uint8_t response[])
   response[3] = 1; // parameter 1 length
 
   if (type == 0x00) {
-    tcpServers[socket] = WiFiServer(port);
+    tcpServers[socket] = WiFiServerSimple(port);
 
     tcpServers[socket].begin();
 
@@ -458,7 +460,7 @@ int availDataTcp(const uint8_t command[], uint8_t response[])
 
   if (socketTypes[socket] == 0x00) {
     if (tcpServers[socket]) {
-      WiFiClient client = tcpServers[socket].available();
+      WiFiSimple client = tcpServers[socket].available();
 
       available = 255;
 
@@ -1478,6 +1480,7 @@ int iotReadInt(const uint8_t command[], uint8_t response[])
       return 5 + sizeof(val) + 1 + sizeof(lastChangeTimestamp);
     }
     /*END FIX*/
+
     //return 5 + sizeof(val);
   }
 

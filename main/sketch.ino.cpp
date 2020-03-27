@@ -85,7 +85,7 @@ void setupWiFi();
 void setupBluetooth();
 
 void setup() {
-  Serial.begin(115200);
+  //Serial.begin(115200);
   setDebug(debug);
 
   // put SWD and SWCLK pins connected to SAMD as inputs
