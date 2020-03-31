@@ -25,7 +25,8 @@
 //#include <WiFiServer.h>
 #include <WiFiServerSimple.h>
 #include <WiFiSSLClient.h>
-#include <WiFiUdp.h>
+//#include <WiFiUdp.h>
+#include <WiFiUdpSimple.h>
 
 #include "arduino_secrets.h"
 #include <ArduinoIoTCloud.h>
@@ -34,9 +35,7 @@
 #include "CommandHandler.h"
 
 const char FIRMWARE_VERSION[6] = "1.3.0";
-#ifdef ARDUINO_NINA_ESP32
-extern char CUSTOMCIAO[5];
-#endif
+
 /*IPAddress*/uint32_t resolvedHostname;
 
 LinkedList<ArduinoCloudProperty *> _global_property_list;
@@ -51,7 +50,7 @@ bool isint16=false;
 uint8_t socketTypes[MAX_SOCKETS];
 //WiFiClient tcpClients[MAX_SOCKETS];
 WiFiSimple tcpClients[MAX_SOCKETS];
-WiFiUDP udps[MAX_SOCKETS];
+WiFiUDPSimple udps[MAX_SOCKETS];
 WiFiSSLClient tlsClients[MAX_SOCKETS];
 WiFiServerSimple tcpServers[MAX_SOCKETS];
 
@@ -770,15 +769,6 @@ int getFwVersion(const uint8_t command[], uint8_t response[])
   memcpy(&response[4], FIRMWARE_VERSION, sizeof(FIRMWARE_VERSION));
 
   return 11;
-}
-int customCommand(const uint8_t command[], uint8_t response[])
-{
-  response[2] = 1; // number of parameters
-  response[3] = sizeof(CUSTOMCIAO); // parameter 1 length
-
-  memcpy(&response[4], CUSTOMCIAO, sizeof(CUSTOMCIAO));
-
-  return 10;
 }
 
 int sendUDPdata(const uint8_t command[], uint8_t response[])
@@ -1616,7 +1606,7 @@ const CommandHandlerType commandHandlers[] = {
   getConnStatus, getIPaddr, getMACaddr, getCurrSSID, getCurrBSSID, getCurrRSSI, getCurrEnct, scanNetworks, startServerTcp, getStateTcp, dataSentTcp, availDataTcp, getDataTcp, startClientTcp, stopClientTcp, getClientStateTcp,
 
   // 0x30 -> 0x3f
-  disconnect, NULL, getIdxRSSI, getIdxEnct, reqHostByName, getHostByName, startScanNetworks, getFwVersion, customCommand, sendUDPdata, getRemoteData, getTime, getIdxBSSID, getIdxChannel, ping, getSocket,
+  disconnect, NULL, getIdxRSSI, getIdxEnct, reqHostByName, getHostByName, startScanNetworks, getFwVersion, NULL, sendUDPdata, getRemoteData, getTime, getIdxBSSID, getIdxChannel, ping, getSocket,
 
   // 0x40 -> 0x4f
   setEnt, NULL, NULL, NULL, sendDataTcp, getDataBufTcp, insertDataBuf, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,

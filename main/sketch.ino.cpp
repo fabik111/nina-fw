@@ -36,8 +36,6 @@ extern "C" {
 
 int debug = 0;
 
-char CUSTOMCIAO[5];
-
 uint8_t* commandBuffer;
 uint8_t* responseBuffer;
 
@@ -92,12 +90,12 @@ void setup() {
   pinMode(15, INPUT);
   pinMode(21, INPUT);
 
-  /*pinMode(5, INPUT);
+  pinMode(5, INPUT);
   if (digitalRead(5) == LOW) {
     setupBluetooth();
-  } else {*/
+  } else {
     setupWiFi();
-  //}
+  }
 }
 
 // #define UNO_WIFI_REV2
