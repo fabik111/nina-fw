@@ -40,8 +40,7 @@ uint8_t WiFiUDPSimple::begin(uint16_t port)
   if (_socket < 0) {
     return 0;
   }
-  ets_printf("upd simple begin");
-  ets_printf("\r\n");
+
   struct sockaddr_in addr;
   memset(&addr, 0x00, sizeof(addr));
 

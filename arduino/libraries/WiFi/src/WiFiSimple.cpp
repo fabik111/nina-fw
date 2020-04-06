@@ -69,7 +69,6 @@ int WiFiSimple::connect(/*IPAddress*/uint32_t ip, uint16_t port)
 
   int nonBlocking = 1;
   lwip_ioctl_r(_socket, FIONBIO, &nonBlocking);
-  //Serial.println("connection succed");
   return 1;
 }
 
@@ -83,18 +82,12 @@ size_t WiFiSimple::write(const uint8_t *buf, size_t size)
   if (_socket == -1) {
     return 0;
   }
-  /*Serial.print("message write: ");
-  for(int i=0; i<size; i++){
-    Serial.print(buf[i], HEX);
-    Serial.print(" ");
-  }
-  Serial.println("");*/
+
   int result = lwip_send_r(_socket, (void*)buf, size, MSG_DONTWAIT);
 
   if (result < 0) {
     lwip_close_r(_socket);
     _socket = -1;
-    Serial.println("after write close");
     return 0;
   }
 
@@ -104,7 +97,6 @@ size_t WiFiSimple::write(const uint8_t *buf, size_t size)
 int WiFiSimple::available()
 {
   if (_socket == -1) {
-    Serial.println("_socket -1");
     return 0;
   }
 
@@ -113,7 +105,6 @@ int WiFiSimple::available()
   if (lwip_ioctl_r(_socket, FIONREAD, &result) < 0) {
     lwip_close_r(_socket);
     _socket = -1;
-    Serial.println("lwip_ioctl_r si spacca");
     return 0;
   }
 
@@ -134,32 +125,19 @@ int WiFiSimple::read()
 int WiFiSimple::read(uint8_t* buf, size_t size)
 {
   if (!available()) {
-    //Serial.println("not available");
     return -1;
   }
 
   int result = lwip_recv_r(_socket, buf, size, MSG_DONTWAIT);
 
-  /*Serial.print("size richiesta: ");
-  Serial.println(size);
-  Serial.print("result ricevuta: ");
-  Serial.println(result);
-  Serial.print("read succed: ");
-  for(int i=0; i<size; i++){
-  Serial.print(buf[i], HEX);
-  Serial.print(" ");
-  }
-  Serial.println();*/
 
   if (result <= 0 && errno != EWOULDBLOCK) {
     lwip_close_r(_socket);
     _socket = -1;
-    Serial.println("result<0 and EWOULDBLOCK");
     return 0;
   }
 
   if (result == 0) {
-    Serial.println("result zero");
     result = -1;
   }
 
@@ -169,7 +147,6 @@ int WiFiSimple::read(uint8_t* buf, size_t size)
 int WiFiSimple::peek()
 {
   uint8_t b;
-  Serial.println("peek called");
   if (recv(_socket, &b, sizeof(b), MSG_PEEK | MSG_DONTWAIT) <= 0) {
     if (errno != EWOULDBLOCK) {
       lwip_close_r(_socket);

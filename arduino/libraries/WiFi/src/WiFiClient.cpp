@@ -78,12 +78,10 @@ int WiFiClient::connect(IPAddress ip, uint16_t port)
 
 int WiFiClient::connect(uint32_t ip, uint16_t port)
 {
-  //Serial.print("connect uint32 to ");
-  //Serial.println(ip);
+
   _socket = lwip_socket(AF_INET, SOCK_STREAM, 0);
 
   if (_socket < 0) {
-    //Serial.println("finite le socket");
     _socket = -1;
     return 0;
   }
@@ -96,7 +94,6 @@ int WiFiClient::connect(uint32_t ip, uint16_t port)
   addr.sin_port = htons(port);
 
   if (lwip_connect_r(_socket, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
-    //Serial.println("connect failed");
     lwip_close_r(_socket);
     _socket = -1;
     return 0;
@@ -104,7 +101,6 @@ int WiFiClient::connect(uint32_t ip, uint16_t port)
 
   int nonBlocking = 1;
   lwip_ioctl_r(_socket, FIONBIO, &nonBlocking);
-//Serial.println("connect succed to server");
   return 1;
 }
 
@@ -163,7 +159,7 @@ int WiFiClient::read(uint8_t* buf, size_t size)
   if (!available()) {
     return -1;
   }
-  //Serial.println("read data from wifi");
+
   int result = lwip_recv_r(_socket, buf, size, MSG_DONTWAIT);
 
   if (result <= 0 && errno != EWOULDBLOCK) {
