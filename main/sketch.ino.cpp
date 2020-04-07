@@ -34,7 +34,7 @@ extern "C" {
 
 #define SPI_BUFFER_LEN SPI_MAX_DMA_LEN
 
-int debug = 0;
+int debug = 1;
 
 uint8_t* commandBuffer;
 uint8_t* responseBuffer;
@@ -43,7 +43,7 @@ void dumpBuffer(const char* label, uint8_t data[], int length) {
   ets_printf("%s: ", label);
 
   for (int i = 0; i < length; i++) {
-    ets_printf("%02x", data[i]);
+    ets_printf("%02x ", data[i]);
   }
 
   ets_printf("\r\n");
@@ -83,7 +83,7 @@ void setupWiFi();
 void setupBluetooth();
 
 void setup() {
-  //Serial.begin(115200);
+
   setDebug(debug);
 
   // put SWD and SWCLK pins connected to SAMD as inputs

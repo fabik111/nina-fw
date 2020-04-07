@@ -17,6 +17,15 @@
   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
+#include <rom/uart.h>
+
+extern "C" {
+  #include <driver/periph_ctrl.h>
+  #include <driver/uart.h>
+  #include <esp_bt.h>
+}
+
+
 #include <lwip/sockets.h>
 
 #include <WiFi.h>
@@ -30,8 +39,9 @@
 
 #include "arduino_secrets.h"
 #include <ArduinoIoTCloud.h>
+#include <utility/ECCX08Cert.h>
 #include <Arduino_ConnectionHandler.h>
-
+#include <ArduinoECCX08.h>
 #include "CommandHandler.h"
 
 const char FIRMWARE_VERSION[6] = "1.3.0";
@@ -1140,6 +1150,13 @@ int setAnalogWrite(const uint8_t command[], uint8_t response[])
     IOT_SET_THING_ID = 0x6B,
     IOT_SET_BOARD_ID = 0x6C,
     IOT_SET_SECRET_KEY = 0x6D,
+    IOT_BEGIN_CSR = 0x70,
+		IOT_END_CSR = 0x71,
+		IOT_BEGIN_STORAGE = 0x72,
+		IOT_END_STORAGE = 0x73,
+		IOT_BEGIN_RECONSTRUCTION = 0x74,
+		IOT_END_RECONSTRUCTION = 0x75,
+		IOT_GET_CERT = 0x76
 
 */
 int iotBegin(const uint8_t command[], uint8_t response[])
@@ -1561,6 +1578,251 @@ int iotSetSecretDeviceKey(const uint8_t command[], uint8_t response[])
   return 6;
 }
 
+//0x70
+int beginCSR(const uint8_t command[], uint8_t response[])
+{
+  ets_printf("dentro beginCSR" );
+      ets_printf("\r\n");
+ if (!ECCX08.begin()) {
+    ets_printf("error crypto chip!");
+
+  }
+  int keySlot = 0;
+  bool newPrivateKey;
+  /*Fix for ARDUINO UNO WIFI REV 2 and other AVR board where int is defined as int16_t*/
+  if(command[3] == 2){
+    int16_t shortvalue;
+    memcpy(&shortvalue,&command[4], command[3] );
+    keySlot = shortvalue;
+  }
+  else{
+    memcpy(&keySlot, &command[4], command[3]);
+  }
+  /*End Fix*/
+
+  memcpy(&newPrivateKey, &command[5 + command[3]], command[4 + command[3]]);
+  ets_printf("begincsr key slot: %d dato: %d ",keySlot ,newPrivateKey );
+      ets_printf("\r\n");
+  uint8_t retcode = ECCX08Cert.beginCSR(keySlot, newPrivateKey);
+   ets_printf("ret code csr: %d  ",retcode );
+      ets_printf("\r\n");
+
+  response[2] = 1; // number of parameters
+  response[3] = 1; // parameter 1 length
+  response[4] = retcode;
+  return 6;
+}
+
+//0x71
+int endCSR(const uint8_t command[], uint8_t response[])
+{
+  String deviceIdString;
+  char deviceId[command[3]];
+  memset(deviceId, 0x00, command[3]);
+  memcpy(deviceId, &command[4], command[3]);
+  ets_printf("end csr deviceid length: %d",command[3] );
+      ets_printf("\r\n");
+  for(int i = 0 ; i<command[3]; i++){
+    ets_printf("%c ",deviceId[i] );
+  }
+  ets_printf("\r\n");
+
+  ECCX08Cert.setSubjectCommonName(String(deviceId));
+  String csr = ECCX08Cert.endCSR();
+  uint16_t csrLength = (csr.length() + 1); // parameter 1 length
+  response[2] = 1; // number of parameters
+  response[3] = (csrLength >> 8) & 0xff; // parameter 1 length
+  response[4] = (csrLength >> 0) & 0xff;
+
+  memcpy(&response[5], csr.c_str(), csrLength);
+  return 6 + csrLength;
+}
+
+//0x72
+int beginStorage(const uint8_t command[], uint8_t response[])
+{
+  int certSlot = 0;
+  int serialNumSlot = 0;
+
+  /*Fix for ARDUINO UNO WIFI REV 2 and other AVR board where int is defined as int16_t*/
+  if(command[3] == 2){
+    int16_t shortcertSlot, shortNumSlot;
+    memcpy(&shortcertSlot, &command[4], command[3] );
+    certSlot = shortcertSlot;
+    memcpy(&shortNumSlot, &command[5 + command[3]], command[4 + command[3]] );
+    serialNumSlot = shortNumSlot;
+  }
+  else{
+    memcpy(&certSlot, &command[4], command[3]);
+    memcpy(&serialNumSlot, &command[5 + command[3]], command[4 + command[3]]);
+  }
+  /*End Fix*/
+
+  uint8_t retcode = ECCX08Cert.beginStorage(certSlot, serialNumSlot);
+  response[2] = 1; // number of parameters
+  response[3] = 1; // parameter 1 length
+  response[4] = retcode;
+  return 6;
+
+}
+
+//0x73
+int endStorage(const uint8_t command[], uint8_t response[])
+{
+  byte signatureBytes[64];
+  byte authorityKeyIdentifierBytes[20];
+  byte serialNumberBytes[16];
+  int data[5];
+
+  memset(signatureBytes, 0x00, 16);
+  memset(authorityKeyIdentifierBytes, 0x00, 20);
+  memset(serialNumberBytes, 0x00, 64);
+
+  memcpy(signatureBytes, &command[4], command[3]);
+  memcpy(authorityKeyIdentifierBytes, &command[5 + command[3]], command[4 + command[3]]);
+  memcpy(serialNumberBytes, &command[6 + command[3] + command[4 + command[3]]], command[5 + command[3] + command[4 + command[3]]]);
+
+  uint8_t *serialNumberBytes_startAddr = (uint8_t *) (&command[6 + command[3] + command[4 + command[3]]]);
+  uint8_t *startAddr= serialNumberBytes_startAddr + command[5 + command[3] + command[4 + command[3]]];
+  uint8_t *currentAddress=startAddr;
+  /*Fix for ARDUINO UNO WIFI REV 2 and other AVR board where int is defined as int16_t*/
+  ets_printf("dim a startaddr %d ",startAddr[0] );
+  ets_printf("\r\n");
+  if(startAddr[0] == 2){
+
+    int16_t shortData[5];
+
+    for(uint8_t k=0; k<5;k++){
+      uint8_t paramLength = *currentAddress;
+      memcpy(&shortData[k], &currentAddress[1],paramLength);
+      data[k] = shortData[k];
+      ets_printf("short elem: %d dato: %d ",k,data[k] );
+      ets_printf("\r\n");
+      currentAddress = currentAddress + 1 + paramLength;
+    }
+
+  }else{
+    for(uint8_t k=0; k<5;k++){
+      uint8_t paramLength = *currentAddress;
+      memcpy(&data[k], &currentAddress[1],paramLength);
+
+      ets_printf("elem: %d dato: %d ",k,data[k] );
+      ets_printf("\r\n");
+      currentAddress = currentAddress + 1 + paramLength;
+    }
+  }
+  /*End Fix*/
+
+  ECCX08Cert.setSignature(signatureBytes);
+  ECCX08Cert.setAuthorityKeyIdentifier(authorityKeyIdentifierBytes);
+  ECCX08Cert.setSerialNumber(serialNumberBytes);
+  ECCX08Cert.setIssueYear(data[0]);
+  ECCX08Cert.setIssueMonth(data[1]);
+  ECCX08Cert.setIssueDay(data[2]);
+  ECCX08Cert.setIssueHour(data[3]);
+  ECCX08Cert.setExpireYears(data[4]);
+  uint8_t retcode = ECCX08Cert.endStorage();
+
+  response[2] = 1; // number of parameters
+  response[3] = 1; // parameter 1 length
+  response[4] = retcode;
+
+  return 6;
+}
+
+//0x74
+int beginReconstruction(const uint8_t command[], uint8_t response[])
+{
+  int keySlot = 0;
+  int compressedCertSlot = 0;
+  int serialNumSlot = 0;
+
+  /*Fix for ARDUINO UNO WIFI REV 2 and other AVR board where int is defined as int16_t*/
+  if(command[3] == 2){
+    int16_t shortkeySlot, shortCertSlot, shortNumSlot;
+    memcpy(&shortkeySlot, &command[4], command[3] );
+    keySlot = shortkeySlot;
+    memcpy(&shortCertSlot, &command[5 + command[3]], command[4 + command[3]]);
+    compressedCertSlot = shortCertSlot;
+    memcpy(&shortNumSlot, &command[6 + command[3] + command[4 + command[3]]], command[5 + command[3] + command[4 + command[3]]]);
+    serialNumSlot = shortNumSlot;
+  }
+  else{
+    memcpy(&keySlot, &command[4], command[3]);
+    memcpy(&compressedCertSlot, &command[5 + command[3]], command[4 + command[3]]);
+    memcpy(&serialNumSlot, &command[6 + command[3] + command[4 + command[3]]], command[5 + command[3] + command[4 + command[3]]]);
+  }
+  /*End Fix*/
+
+
+  uint8_t retcode = ECCX08Cert.beginReconstruction(keySlot, compressedCertSlot, serialNumSlot);
+
+  response[2] = 1; // number of parameters
+  response[3] = 1; // parameter 1 length
+  response[4] = retcode;
+  return 6;
+}
+
+//0x75
+int endReconstruction(const uint8_t command[], uint8_t response[])
+{
+  char countryName[command[3]];
+  char organizationName[command[4 + command[3]]];
+  char organizationalUnitName[command[5 + command[3] + command[4 + command[3]]]];
+  uint16_t dimfirstparam = command[3];
+  uint16_t dimsecondparam = command[4 + command[3]];
+  uint16_t dimthirdparam = command[5 + command[3] + command[4 + command[3]]];
+  char commonName[command[6 + dimfirstparam + dimsecondparam + dimthirdparam]];
+
+  memcpy(countryName, &command[4], command[3]);
+  memcpy(organizationName, &command[5 + command[3]], command[4 + command[3]]);
+  memcpy(organizationalUnitName, &command[6 +  command[3] + command[4 + command[3]]], command[5 + command[3] +  command[4 + command[3]]]);
+  memcpy(commonName, &command[7 + dimfirstparam + dimsecondparam + dimthirdparam], command[6 +  dimfirstparam + dimsecondparam + dimthirdparam]);
+
+  ECCX08Cert.setIssuerCountryName(String(countryName));
+  ECCX08Cert.setIssuerOrganizationName(String(organizationName));
+  ECCX08Cert.setIssuerOrganizationalUnitName(String(organizationalUnitName));
+  ECCX08Cert.setIssuerCommonName(String(commonName));
+
+  uint16_t retcode = ECCX08Cert.endReconstruction();
+
+  if(retcode != 0){
+    retcode = ECCX08Cert.length();
+  }
+
+  response[2] = 1; // number of parameters
+  response[3] = sizeof(retcode); // parameter 1 length
+
+  memcpy(&response[4], &retcode, sizeof(retcode));
+
+  return 6;
+}
+
+//0x76
+int getCertBytes(const uint8_t command[], uint8_t response[]){
+  uint16_t certLength = ECCX08Cert.length();
+  byte *cert = ECCX08Cert.bytes();
+
+  response[2] = 1; // number of parameters
+  response[3] = (certLength >> 8) & 0xff; // parameter 1 length
+  response[4] = (certLength >> 0) & 0xff;
+
+  memcpy(&response[5], &cert, certLength);
+
+  return 6 + certLength;
+}
+
+//0x77
+int getCertLength(const uint8_t command[], uint8_t response[]){
+  uint16_t certLength = ECCX08Cert.length();
+
+  response[2] = 1; // number of parameters
+  response[3] = sizeof(certLength); // parameter 1 length
+
+  memcpy(&response[4], &certLength, sizeof(certLength));
+
+  return 6 + sizeof(certLength);
+}
 
 
 typedef int (*CommandHandlerType)(const uint8_t command[], uint8_t response[]);
@@ -1586,6 +1848,9 @@ const CommandHandlerType commandHandlers[] = {
 
   // 0x60 -> 0x6f
   iotBegin, iotUpdate, iotAddProperty, iotUpdateBool, iotUpdateInt, iotUpdateFloat, iotUpdateString, iotReadBool, iotReadInt, iotReadFloat, iotReadString, iotSetThingID, iotSetBoardId, iotSetSecretDeviceKey, NULL, NULL,
+
+  //0x70 -> 0x7f
+  beginCSR, endCSR, beginStorage, endStorage, beginReconstruction, endReconstruction, getCertBytes, getCertLength, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 };
 
 #define NUM_COMMAND_HANDLERS (sizeof(commandHandlers) / sizeof(commandHandlers[0]))
