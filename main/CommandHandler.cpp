@@ -17,15 +17,6 @@
   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
-#include <rom/uart.h>
-
-extern "C" {
-  #include <driver/periph_ctrl.h>
-  #include <driver/uart.h>
-  #include <esp_bt.h>
-}
-
-
 #include <lwip/sockets.h>
 
 #include <WiFi.h>
@@ -1581,12 +1572,14 @@ int iotSetSecretDeviceKey(const uint8_t command[], uint8_t response[])
 //0x70
 int beginCSR(const uint8_t command[], uint8_t response[])
 {
-  ets_printf("dentro beginCSR" );
-      ets_printf("\r\n");
- if (!ECCX08.begin()) {
-    ets_printf("error crypto chip!");
 
+ if (!ECCX08.begin()) {
+    response[2] = 1; // number of parameters
+    response[3] = 1; // parameter 1 length
+    response[4] = 0;
+    return 6;
   }
+
   int keySlot = 0;
   bool newPrivateKey;
   /*Fix for ARDUINO UNO WIFI REV 2 and other AVR board where int is defined as int16_t*/
@@ -1601,11 +1594,8 @@ int beginCSR(const uint8_t command[], uint8_t response[])
   /*End Fix*/
 
   memcpy(&newPrivateKey, &command[5 + command[3]], command[4 + command[3]]);
-  ets_printf("begincsr key slot: %d dato: %d ",keySlot ,newPrivateKey );
-      ets_printf("\r\n");
+
   uint8_t retcode = ECCX08Cert.beginCSR(keySlot, newPrivateKey);
-   ets_printf("ret code csr: %d  ",retcode );
-      ets_printf("\r\n");
 
   response[2] = 1; // number of parameters
   response[3] = 1; // parameter 1 length
@@ -1620,14 +1610,10 @@ int endCSR(const uint8_t command[], uint8_t response[])
   char deviceId[command[3]];
   memset(deviceId, 0x00, command[3]);
   memcpy(deviceId, &command[4], command[3]);
-  ets_printf("end csr deviceid length: %d",command[3] );
-      ets_printf("\r\n");
-  for(int i = 0 ; i<command[3]; i++){
-    ets_printf("%c ",deviceId[i] );
-  }
-  ets_printf("\r\n");
 
-  ECCX08Cert.setSubjectCommonName(String(deviceId));
+  deviceIdString = deviceId;
+
+  ECCX08Cert.setSubjectCommonName(deviceIdString);
   String csr = ECCX08Cert.endCSR();
   uint16_t csrLength = (csr.length() + 1); // parameter 1 length
   response[2] = 1; // number of parameters
@@ -1674,9 +1660,9 @@ int endStorage(const uint8_t command[], uint8_t response[])
   byte serialNumberBytes[16];
   int data[5];
 
-  memset(signatureBytes, 0x00, 16);
+  memset(signatureBytes, 0x00, 64);
   memset(authorityKeyIdentifierBytes, 0x00, 20);
-  memset(serialNumberBytes, 0x00, 64);
+  memset(serialNumberBytes, 0x00, 16);
 
   memcpy(signatureBytes, &command[4], command[3]);
   memcpy(authorityKeyIdentifierBytes, &command[5 + command[3]], command[4 + command[3]]);
@@ -1686,8 +1672,7 @@ int endStorage(const uint8_t command[], uint8_t response[])
   uint8_t *startAddr= serialNumberBytes_startAddr + command[5 + command[3] + command[4 + command[3]]];
   uint8_t *currentAddress=startAddr;
   /*Fix for ARDUINO UNO WIFI REV 2 and other AVR board where int is defined as int16_t*/
-  ets_printf("dim a startaddr %d ",startAddr[0] );
-  ets_printf("\r\n");
+
   if(startAddr[0] == 2){
 
     int16_t shortData[5];
@@ -1696,8 +1681,6 @@ int endStorage(const uint8_t command[], uint8_t response[])
       uint8_t paramLength = *currentAddress;
       memcpy(&shortData[k], &currentAddress[1],paramLength);
       data[k] = shortData[k];
-      ets_printf("short elem: %d dato: %d ",k,data[k] );
-      ets_printf("\r\n");
       currentAddress = currentAddress + 1 + paramLength;
     }
 
@@ -1705,9 +1688,6 @@ int endStorage(const uint8_t command[], uint8_t response[])
     for(uint8_t k=0; k<5;k++){
       uint8_t paramLength = *currentAddress;
       memcpy(&data[k], &currentAddress[1],paramLength);
-
-      ets_printf("elem: %d dato: %d ",k,data[k] );
-      ets_printf("\r\n");
       currentAddress = currentAddress + 1 + paramLength;
     }
   }
@@ -1754,7 +1734,6 @@ int beginReconstruction(const uint8_t command[], uint8_t response[])
   }
   /*End Fix*/
 
-
   uint8_t retcode = ECCX08Cert.beginReconstruction(keySlot, compressedCertSlot, serialNumSlot);
 
   response[2] = 1; // number of parameters
@@ -1779,6 +1758,7 @@ int endReconstruction(const uint8_t command[], uint8_t response[])
   memcpy(organizationalUnitName, &command[6 +  command[3] + command[4 + command[3]]], command[5 + command[3] +  command[4 + command[3]]]);
   memcpy(commonName, &command[7 + dimfirstparam + dimsecondparam + dimthirdparam], command[6 +  dimfirstparam + dimsecondparam + dimthirdparam]);
 
+
   ECCX08Cert.setIssuerCountryName(String(countryName));
   ECCX08Cert.setIssuerOrganizationName(String(organizationName));
   ECCX08Cert.setIssuerOrganizationalUnitName(String(organizationalUnitName));
@@ -1795,7 +1775,7 @@ int endReconstruction(const uint8_t command[], uint8_t response[])
 
   memcpy(&response[4], &retcode, sizeof(retcode));
 
-  return 6;
+  return 5 + sizeof(retcode);
 }
 
 //0x76
@@ -1807,7 +1787,7 @@ int getCertBytes(const uint8_t command[], uint8_t response[]){
   response[3] = (certLength >> 8) & 0xff; // parameter 1 length
   response[4] = (certLength >> 0) & 0xff;
 
-  memcpy(&response[5], &cert, certLength);
+  memcpy(&response[5], cert, certLength);
 
   return 6 + certLength;
 }
@@ -1821,7 +1801,7 @@ int getCertLength(const uint8_t command[], uint8_t response[]){
 
   memcpy(&response[4], &certLength, sizeof(certLength));
 
-  return 6 + sizeof(certLength);
+  return 5 + sizeof(certLength);
 }
 
 
