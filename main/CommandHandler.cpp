@@ -29,18 +29,30 @@
 #include <WiFiUdpSimple.h>
 
 #include "arduino_secrets.h"
+
+//#include <utility/ECCX08Cert.h>
 #include <ArduinoIoTCloud.h>
-#include <utility/ECCX08Cert.h>
+#include <utility/crypto/ECCX08Cert.h>
 #include <Arduino_ConnectionHandler.h>
 #include <ArduinoECCX08.h>
+#include <ArduinoBearSSL.h>
+#include <ArduinoMqttClient.h>
+
 #include "CommandHandler.h"
 
 const char FIRMWARE_VERSION[6] = "1.3.0";
 
 /*IPAddress*/uint32_t resolvedHostname;
 
-LinkedList<ArduinoCloudProperty *> _global_property_list;
+//LinkedList<ArduinoCloudProperty *> _global_property_list;
 WiFiConnectionHandler *ArduinoIoTPreferredConnection;
+ECCX08CertClass _eccx08_cert;
+BearSSLClient* _sslClient;
+MqttClient* _mqttClient;
+LinkedList<String *> _global_topic_list;
+String devId;
+bool isMessageReady = false;
+
 char ssid[32 + 1];
 char pass[64 + 1];
 char mqtt[64 + 1];
@@ -1152,6 +1164,316 @@ int setAnalogWrite(const uint8_t command[], uint8_t response[])
 */
 int iotBegin(const uint8_t command[], uint8_t response[])
 {
+  uint8_t res = 1;
+
+  memset(ssid, 0x00, sizeof(ssid));
+  memset(pass, 0x00, sizeof(pass));
+
+  memcpy(ssid, &command[4], command[3]);
+  memcpy(pass, &command[5 + command[3]], command[4 + command[3]]);
+
+  ArduinoIoTPreferredConnection = new WiFiConnectionHandler(ssid, pass);
+
+  if (!ECCX08.begin())                                                                                                                                                         { res = 0; }
+  if (!CryptoUtil::readDeviceId(ECCX08, getDeviceId(), ECCX08Slot::DeviceId))                                                                                                  { res = 0; }
+  if (!CryptoUtil::reconstructCertificate(_eccx08_cert, getDeviceId(), ECCX08Slot::Key, ECCX08Slot::CompressedCertificate, ECCX08Slot::SerialNumberAndAuthorityKeyIdentifier)) { res = 0; }
+
+  ArduinoBearSSL.onGetTime(getTime);
+
+  _sslClient = new BearSSLClient(ArduinoIoTPreferredConnection->getClient(), ArduinoIoTCloudTrustAnchor, ArduinoIoTCloudTrustAnchor_NUM);
+  _sslClient->setEccSlot(static_cast<int>(ECCX08Slot::Key), _eccx08_cert.bytes(), _eccx08_cert.length());
+  _mqttClient = new MqttClient(*_sslClient);
+  _mqttClient->onMessage(mqttOnMessage);
+  response[2] = 1; // number of parameters
+  response[3] = 1; // parameter 1 length
+  response[4] = res;
+
+  return 6;
+}
+//0x61
+int MQTTsetKeepAliveInterval(const uint8_t command[], uint8_t response [])
+{
+  uint32_t keepAlive = 0;
+  /*Fix for ARDUINO UNO WIFI REV 2 and other AVR board where int is defined as int16_t*/
+  if(command[3] == 2){
+    uint16_t shortvalue;
+    memcpy(&shortvalue, &command[4],  command[3] );
+    keepAlive = shortvalue;
+    if(!isint16){
+      isint16=true;
+    }
+
+  }
+  else{
+    memcpy(&keepAlive, &command[4],  command[3] );
+  }
+  /*End Fix*/
+
+  _mqttClient->setKeepAliveInterval(keepAlive);
+
+  response[2] = 1; // number of parameters
+  response[3] = 1; // parameter 1 length
+  response[4] = 1;
+
+  return 6;
+
+}
+
+int MQTTsetConnectionTimeout(const uint8_t command[], uint8_t response [])
+{
+  uint32_t connTimeout = 0;
+  /*Fix for ARDUINO UNO WIFI REV 2 and other AVR board where int is defined as int16_t*/
+  if(command[3] == 2){
+    uint16_t shortvalue;
+    memcpy(&shortvalue, &command[4], command[3] );
+    connTimeout = shortvalue;
+    if(!isint16){
+      isint16=true;
+    }
+  }
+  else{
+    memcpy(&connTimeout, &command[4], command[3] );
+  }
+  /*End Fix*/
+
+  _mqttClient->setConnectionTimeout(connTimeout)
+
+  response[2] = 1; // number of parameters
+  response[3] = 1; // parameter 1 length
+  response[4] = 1;
+
+  return 6;
+}
+
+int MQTTsetID(const uint8_t command[], uint8_t response [])
+{
+
+  char value[command[3]];
+  memset(value, 0x00, command[3]);
+  memcpy(value, &command[4], command[3]);
+
+  devId = value;
+
+  _mqttClient->setId(devId.c_str());
+
+  response[2] = 1; // number of parameters
+  response[3] = 1; // parameter 1 length
+  response[4] = 1;
+
+  return 6;
+
+}
+
+int MQTTconnect(const uint8_t command[], uint8_t response [])
+{
+  uint16_t port = 0;
+  memset(mqtt, 0x00, sizeof(mqtt));
+  memcpy(mqtt, &command[4],command[3]);
+  memcpy(&port, &command[5 + command[3]], command[4 + command[3]]);
+
+  int8_t retCode = _mqttClient->connect(mqtt, port);
+
+  response[2] = 1; // number of parameters
+  response[3] = 1; // parameter 1 length
+  response[4] = retCode;
+
+  return 6;
+
+}
+
+int MQTTsubscribe(const uint8_t command[], uint8_t response [])
+{
+  String *topicSTR = new String();
+  char topic[command[3]];
+  uint8_t qos;
+  memcpy(topic, &command[4],command[3]);
+  memcpy(&qos, &command[5 + command[3]], command[4 + command[3]] )
+  *topicSTR = topic;
+  _global_topic_list.add(topicSTR);
+
+  int8_t retCode = _mqttClient->subscribe(*topicSTR, qos );
+
+  response[2] = 1; // number of parameters
+  response[3] = 1; // parameter 1 length
+  response[4] = retCode;
+
+  return 6;
+}
+
+int MQTTstop(const uint8_t command[], uint8_t response [])
+{
+  _mqttClient->stop();
+
+  response[2] = 1; // number of parameters
+  response[3] = 1; // parameter 1 length
+  response[4] = 1;
+
+  return 6;
+}
+
+int MQTTconnected(const uint8_t command[], uint8_t response [])
+{
+  uint8_t connected = _mqttClient->connected();
+
+  response[2] = 1; // number of parameters
+  response[3] = 1; // parameter 1 length
+  response[4] = connected;
+
+  return 6;
+}
+
+int MQTTbeginMessage(const uint8_t command[], uint8_t response [])
+{
+  //const String& topic, unsigned long size, bool retain = false, uint8_t qos = 0, bool dup = false
+
+  char topicName[command[3]];
+  uint32_t size;
+  uint8_t retCode = 255;
+  //arg 1
+  memcpy(topicName,&command[4], command[3]);
+
+  //arg 2
+  /*Fix for ARDUINO UNO WIFI REV 2 and other AVR board where int is defined as int16_t*/
+  if(command[4 + command[3]] == 2){
+    uint16_t shortvalue;
+    memcpy(&shortvalue, &command[5 + command[3]], command[4 + command[3]] );
+    size = shortvalue;
+    if(!isint16){
+      isint16=true;
+    }
+  }
+  else{
+    memcpy(&size, &command[5 + command[3]], command[4 + command[3]] );
+  }
+  //arg 3-4-5
+  uint8_t data[3];
+  uint16_t *startAddr = (uint16_t *) (&command[5 + command[3] + command[4 + command[3]]]);
+  uint16_t *currentAddress=startAddr;
+  for(uint8_t k=0; k<3;k++){
+    uint16_t paramLength = *currentAddress;
+    memcpy(&data[k], &currentAddress[1],paramLength);
+    currentAddress = currentAddress + 1 + paramLength;
+  }
+  String *topic = getTopicObj(String(topicName));
+  if(topic){
+
+    retCode = _mqttClient->beginMessage(*topic, size, (bool)data[0], (uint8_t)data[1], (bool)data[2]);
+  }
+
+  response[2] = 1; // number of parameters
+  response[3] = 1; // parameter 1 length
+  response[4] = retCode;
+
+  return 6;
+}
+
+String * getTopicObj(String name)
+{
+  for(int i=0; i<_global_topic_list.size(); i++){
+    String *temp = _global_property_list.get(i);
+    if(*temp == name){
+      return temp;
+    }
+  }
+  return NULL;
+}
+
+int MQTTwrite(const uint8_t command[], uint8_t response [])
+{
+  char data[command[3]];
+  int size;
+  memcpy(data,&command[4],command[3]);
+  /*Fix for ARDUINO UNO WIFI REV 2 and other AVR board where int is defined as int16_t*/
+  if(command[4 + command[3]] == 2){
+    int16_t shortvalue;
+    memcpy(&shortvalue, &command[5 + command[3]], command[4 + command[3]] );
+    size = shortvalue;
+    if(!isint16){
+      isint16=true;
+    }
+  }
+  else{
+    memcpy(&size, &command[5 + command[3]], command[4 + command[3]] );
+  }
+
+  int retLength = _mqttClient->write(data, size);
+  response[2] = 1; // number of parameters
+  if(isint16){
+    response[3] = 2; // parameter 1 length
+
+    memcpy(&response[4], &retLength, 2);
+
+    return 5 + 2;
+  }
+  else{
+    response[3] = sizeof(retLength); // parameter 1 length
+
+    memcpy(&response[4], &retLength, sizeof(retLength));
+
+    return 5 + sizeof(retLength);
+  }
+
+}
+
+int MQTTendMessage(const uint8_t command[], uint8_t response [])
+{
+  uint8_t retCode = _mqttClient->endMessage();
+  response[2] = 1; // number of parameters
+  response[3] = 1; // parameter 1 length
+  response[4] = retCode;
+
+  return 6;
+}
+
+int MQTTmessageTopic(const uint8_t command[], uint8_t response [])
+{
+  String topic = _mqttClient->messageTopic();
+  response[2] = 1; // number of parameters
+  response[3] = (topic.length() + 1); // parameter 1 length
+  memcpy(&response[4], topic.c_str(), (topic.length() + 1));
+  return 5 + topic.length() + 1;
+}
+
+int MQTTread(const uint8_t command[], uint8_t response [])
+{
+  uint8_t byte = _mqttClient->read();
+  response[2] = 1; // number of parameters
+  response[3] = 1; // parameter 1 length
+  response[4] = byte;
+
+  return 6;
+}
+
+int MQTTpoll()
+{
+  _mqttClient->poll();
+  response[2] = 1; // number of parameters
+  response[3] = 1; // parameter 1 length
+  uint8_t notifyMessage = 0;
+  if(isMessageReady) {notifyMessage=1;}
+  response[4] = notifyMessage;
+
+  return 6;
+
+}
+
+int connectionCheck()
+{
+  uint8_t connStatus = _connection->check();
+  response[2] = 1; // number of parameters
+  response[3] = 1; // parameter 1 length
+  response[4] = connStatus;
+
+  return 6;
+}
+
+void mqttOnMessage()
+{
+  isMessageReady = true;
+}
+
+/*int iotBegin(const uint8_t command[], uint8_t response[])
+{
 
 
   memset(ssid, 0x00, sizeof(ssid));
@@ -1173,7 +1495,7 @@ int iotBegin(const uint8_t command[], uint8_t response[])
   response[4] = 1;
 
   return 6;
-}
+}*/
 
 int iotUpdate(const uint8_t command[], uint8_t response[])
 {
