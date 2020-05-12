@@ -22,10 +22,7 @@
 
 #include <stdint.h>
 #include <LinkedList.h>
-#include <CloudBool.h>
-#include <CloudFloat.h>
-#include <CloudInt.h>
-#include <CloudString.h>
+
 
 class CommandHandlerClass {
 public:
