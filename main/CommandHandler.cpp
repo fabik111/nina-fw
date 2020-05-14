@@ -36,12 +36,21 @@
 #include <ECCX08Cert.h>
 #include <Arduino_ConnectionHandler.h>
 #include <ArduinoECCX08.h>
-  #include "CryptoUtil.h"
-  #include "BearSSLTrustAnchor.h"
+#include "CryptoUtil.h"
+#include "BearSSLTrustAnchor.h"
+#include "TimeService.h"
 #include <ArduinoBearSSL.h>
 #include <ArduinoMqttClient.h>
 
 #include "CommandHandler.h"
+
+#include <rom/uart.h>
+
+extern "C" {
+  #include <driver/periph_ctrl.h>
+  #include <driver/uart.h>
+  #include <esp_bt.h>
+}
 
 const char FIRMWARE_VERSION[6] = "1.3.0";
 
@@ -49,6 +58,7 @@ const char FIRMWARE_VERSION[6] = "1.3.0";
 
 //LinkedList<ArduinoCloudProperty *> _global_property_list;
 WiFiConnectionHandler *ArduinoIoTPreferredConnection;
+TimeService time_service;
 ECCX08CertClass _eccx08_cert;
 BearSSLClient* _sslClient;
 MqttClient* _mqttClient;
@@ -1177,7 +1187,10 @@ String & getDeviceId(){
 }
 
 unsigned long MQTTGetTime(){
-  return WiFi.getTime();
+  unsigned long time = time_service.getTime();
+  ets_printf("time %d", time);
+  ets_printf("\r\n");
+  return time;
 }
 
 
@@ -1192,6 +1205,7 @@ int iotBegin(const uint8_t command[], uint8_t response[])
   memcpy(pass, &command[5 + command[3]], command[4 + command[3]]);
 
   ArduinoIoTPreferredConnection = new WiFiConnectionHandler(ssid, pass);
+  time_service.begin(ArduinoIoTPreferredConnection);
 
   if (!ECCX08.begin())                                                                                                                                                         { res = 0; }
   if (!CryptoUtil::readDeviceId(ECCX08, getDeviceId(), ECCX08Slot::DeviceId))                                                                                                  { res = 0; }
@@ -1207,12 +1221,15 @@ int iotBegin(const uint8_t command[], uint8_t response[])
   response[2] = 1; // number of parameters
   response[3] = 1; // parameter 1 length
   response[4] = res;
-
+  ets_printf("iotBegin");
+  ets_printf("\r\n");
   return 6;
 }
 //0x61
 int MQTTsetKeepAliveInterval(const uint8_t command[], uint8_t response [])
 {
+    ets_printf("setkeepalive");
+  ets_printf("\r\n");
   uint32_t keepAlive = 0;
   /*Fix for ARDUINO UNO WIFI REV 2 and other AVR board where int is defined as int16_t*/
   if(command[3] == 2){
@@ -1234,7 +1251,8 @@ int MQTTsetKeepAliveInterval(const uint8_t command[], uint8_t response [])
   response[2] = 1; // number of parameters
   response[3] = 1; // parameter 1 length
   response[4] = 1;
-
+    ets_printf("MQTTsetKeepAliveInterval");
+  ets_printf("\r\n");
   return 6;
 
 }
@@ -1257,7 +1275,8 @@ int MQTTsetConnectionTimeout(const uint8_t command[], uint8_t response [])
   /*End Fix*/
 
   _mqttClient->setConnectionTimeout(connTimeout);
-
+    ets_printf("setconntimeout");
+  ets_printf("\r\n");
   response[2] = 1; // number of parameters
   response[3] = 1; // parameter 1 length
   response[4] = 1;
@@ -1267,13 +1286,15 @@ int MQTTsetConnectionTimeout(const uint8_t command[], uint8_t response [])
 
 int MQTTsetID(const uint8_t command[], uint8_t response [])
 {
+  if(command[3] != 0){
+    char value[command[3]];
+    memset(value, 0x00, command[3]);
+    memcpy(value, &command[4], command[3]);
 
-  char value[command[3]];
-  memset(value, 0x00, command[3]);
-  memcpy(value, &command[4], command[3]);
-
-  devId = value;
-
+    devId = value;
+  }
+    ets_printf("mqttsetID");
+  ets_printf("\r\n");
   _mqttClient->setId(devId.c_str());
 
   response[2] = 1; // number of parameters
@@ -1286,13 +1307,17 @@ int MQTTsetID(const uint8_t command[], uint8_t response [])
 
 int MQTTconnect(const uint8_t command[], uint8_t response [])
 {
+  ets_printf("mqttconnect");
+  ets_printf("\r\n");
   uint16_t port = 0;
   memset(mqtt, 0x00, sizeof(mqtt));
   memcpy(mqtt, &command[4],command[3]);
   memcpy(&port, &command[5 + command[3]], command[4 + command[3]]);
-
-  int8_t retCode = _mqttClient->connect(mqtt, port);
-
+  ets_printf("mqttconnect allocazioni");
+  ets_printf("\r\n");
+  uint8_t retCode = _mqttClient->connect(mqtt, port);
+ets_printf("mqttconnect tentativo");
+  ets_printf("\r\n");
   response[2] = 1; // number of parameters
   response[3] = 1; // parameter 1 length
   response[4] = retCode;
@@ -1303,12 +1328,16 @@ int MQTTconnect(const uint8_t command[], uint8_t response [])
 
 int MQTTsubscribe(const uint8_t command[], uint8_t response [])
 {
+  ets_printf("mqttsubscribe");
+  ets_printf("\r\n");
   String *topicSTR = new String();
   char topic[command[3]];
   uint8_t qos;
   memcpy(topic, &command[4],command[3]);
   memcpy(&qos, &command[5 + command[3]], command[4 + command[3]] );
   *topicSTR = topic;
+    ets_printf("mqttsubscribe topic %s",*topicSTR);
+  ets_printf("\r\n");
   _global_topic_list.add(topicSTR);
 
   int8_t retCode = _mqttClient->subscribe(*topicSTR, qos );
@@ -1322,6 +1351,8 @@ int MQTTsubscribe(const uint8_t command[], uint8_t response [])
 
 int MQTTstop(const uint8_t command[], uint8_t response [])
 {
+      ets_printf("mqttstop");
+  ets_printf("\r\n");
   _mqttClient->stop();
 
   response[2] = 1; // number of parameters
@@ -1333,6 +1364,8 @@ int MQTTstop(const uint8_t command[], uint8_t response [])
 
 int MQTTconnected(const uint8_t command[], uint8_t response [])
 {
+    ets_printf("mqttconnected");
+  ets_printf("\r\n");
   uint8_t connected = _mqttClient->connected();
 
   response[2] = 1; // number of parameters
@@ -1356,7 +1389,8 @@ String * getTopicObj(String name)
 int MQTTbeginMessage(const uint8_t command[], uint8_t response [])
 {
   //const String& topic, unsigned long size, bool retain = false, uint8_t qos = 0, bool dup = false
-
+  ets_printf("mqttbeginmessage");
+  ets_printf("\r\n");
   char topicName[command[3]];
   uint32_t size;
   uint8_t retCode = 255;
@@ -1387,7 +1421,8 @@ int MQTTbeginMessage(const uint8_t command[], uint8_t response [])
   }
   String *topic = getTopicObj(String(topicName));
   if(topic){
-
+      ets_printf("mqttbeginmessage topic found");
+  ets_printf("\r\n");
     retCode = _mqttClient->beginMessage(*topic, size, (bool)data[0], (uint8_t)data[1], (bool)data[2]);
   }
 
@@ -1400,6 +1435,8 @@ int MQTTbeginMessage(const uint8_t command[], uint8_t response [])
 
 int MQTTwrite(const uint8_t command[], uint8_t response [])
 {
+  ets_printf("mqttWrite");
+  ets_printf("\r\n");
   uint8_t data[command[3]];
   int size;
   memcpy(data,&command[4],command[3]);
@@ -1437,6 +1474,8 @@ int MQTTwrite(const uint8_t command[], uint8_t response [])
 
 int MQTTendMessage(const uint8_t command[], uint8_t response [])
 {
+  ets_printf("mqttMessageTopic");
+  ets_printf("\r\n");
   uint8_t retCode = _mqttClient->endMessage();
   response[2] = 1; // number of parameters
   response[3] = 1; // parameter 1 length
@@ -1447,6 +1486,8 @@ int MQTTendMessage(const uint8_t command[], uint8_t response [])
 
 int MQTTmessageTopic(const uint8_t command[], uint8_t response [])
 {
+  ets_printf("mqttMessageTopic");
+  ets_printf("\r\n");
   String topic = _mqttClient->messageTopic();
   response[2] = 1; // number of parameters
   response[3] = (topic.length() + 1); // parameter 1 length
@@ -1456,6 +1497,8 @@ int MQTTmessageTopic(const uint8_t command[], uint8_t response [])
 
 int MQTTread(const uint8_t command[], uint8_t response [])
 {
+  ets_printf("mqttRead");
+  ets_printf("\r\n");
   uint8_t byte = _mqttClient->read();
   response[2] = 1; // number of parameters
   response[3] = 1; // parameter 1 length
@@ -1466,6 +1509,8 @@ int MQTTread(const uint8_t command[], uint8_t response [])
 
 int MQTTpoll(const uint8_t command[], uint8_t response [])
 {
+     ets_printf("mqttpoll");
+  ets_printf("\r\n");
   _mqttClient->poll();
   response[2] = 1; // number of parameters
   response[3] = 1; // parameter 1 length
@@ -1496,6 +1541,8 @@ int MQTTpoll(const uint8_t command[], uint8_t response [])
 
 int connectionCheck(const uint8_t command[], uint8_t response [])
 {
+     ets_printf("conncheck");
+  ets_printf("\r\n");
   uint8_t connStatus = (uint8_t) ArduinoIoTPreferredConnection->check();
   response[2] = 1; // number of parameters
   response[3] = 1; // parameter 1 length
@@ -1533,7 +1580,8 @@ int beginCSR(const uint8_t command[], uint8_t response[])
   memcpy(&newPrivateKey, &command[5 + command[3]], command[4 + command[3]]);
 
   uint8_t retcode = _eccx08_cert.beginCSR(keySlot, newPrivateKey);
-
+   ets_printf("begincsr");
+  ets_printf("\r\n");
   response[2] = 1; // number of parameters
   response[3] = 1; // parameter 1 length
   response[4] = retcode;
@@ -1549,7 +1597,8 @@ int endCSR(const uint8_t command[], uint8_t response[])
   memcpy(deviceId, &command[4], command[3]);
 
   deviceIdString = deviceId;
-
+  ets_printf("endcsr");
+  ets_printf("\r\n");
   _eccx08_cert.setSubjectCommonName(deviceIdString);
   String csr = _eccx08_cert.endCSR();
   uint16_t csrLength = (csr.length() + 1); // parameter 1 length
@@ -1582,6 +1631,8 @@ int beginStorage(const uint8_t command[], uint8_t response[])
   /*End Fix*/
 
   uint8_t retcode = _eccx08_cert.beginStorage(certSlot, serialNumSlot);
+    ets_printf("biginstorage");
+  ets_printf("\r\n");
   response[2] = 1; // number of parameters
   response[3] = 1; // parameter 1 length
   response[4] = retcode;
@@ -1639,7 +1690,8 @@ int endStorage(const uint8_t command[], uint8_t response[])
   _eccx08_cert.setIssueHour(data[3]);
   _eccx08_cert.setExpireYears(data[4]);
   uint8_t retcode = _eccx08_cert.endStorage();
-
+  ets_printf("endstorage");
+  ets_printf("\r\n");
   response[2] = 1; // number of parameters
   response[3] = 1; // parameter 1 length
   response[4] = retcode;
@@ -1670,7 +1722,8 @@ int beginReconstruction(const uint8_t command[], uint8_t response[])
     memcpy(&serialNumSlot, &command[6 + command[3] + command[4 + command[3]]], command[5 + command[3] + command[4 + command[3]]]);
   }
   /*End Fix*/
-
+ ets_printf("begin reco");
+  ets_printf("\r\n");
   uint8_t retcode = _eccx08_cert.beginReconstruction(keySlot, compressedCertSlot, serialNumSlot);
 
   response[2] = 1; // number of parameters
@@ -1706,7 +1759,8 @@ int endReconstruction(const uint8_t command[], uint8_t response[])
   if(retcode != 0){
     retcode = _eccx08_cert.length();
   }
-
+  ets_printf("cert length %d",retcode);
+  ets_printf("\r\n");
   response[2] = 1; // number of parameters
   response[3] = sizeof(retcode); // parameter 1 length
 
@@ -1725,7 +1779,8 @@ int getCertBytes(const uint8_t command[], uint8_t response[]){
   response[4] = (certLength >> 0) & 0xff;
 
   memcpy(&response[5], cert, certLength);
-
+    ets_printf("getcertbytes");
+  ets_printf("\r\n");
   return 6 + certLength;
 }
 
@@ -1737,7 +1792,8 @@ int getCertLength(const uint8_t command[], uint8_t response[]){
   response[3] = sizeof(certLength); // parameter 1 length
 
   memcpy(&response[4], &certLength, sizeof(certLength));
-
+    ets_printf("getcertlength");
+  ets_printf("\r\n");
   return 5 + sizeof(certLength);
 }
 
